@@ -1,16 +1,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 
 #include "adc.h"
 #include "memory_map.h"
 #include "optical.h"
 #include "scm3c_hw_interface.h"
-
-// Number of for loop cycles after between ADC reads.
-// 700000 for loop cycles roughly correspond to 1 second.
-#define NUM_CYCLES_BETWEEN_ADC_READS 700000
 
 // ADC configuration.
 static const adc_config_t g_adc_config = {
@@ -21,9 +17,9 @@ static const adc_config_t g_adc_config = {
     .settling_time = 0,
     .bandgap_reference_tuning_code = 1,
     .const_gm_tuning_code = 0xFF,
-    .vbat_div_4_enabled = false,
+    .vbat_div_4_enabled = true,
     .ldo_enabled = true,
-    .input_mux_select = ADC_INPUT_MUX_SELECT_EXTERNAL_SIGNAL,
+    .input_mux_select = ADC_INPUT_MUX_SELECT_V_BAT_DIV_4,
     .pga_bypass = true,
 };
 
@@ -42,12 +38,18 @@ int main(void) {
     perform_calibration();
 
     while (true) {
-        printf("Reading the ADC output.\n");
-        uint16_t adc_output = adc_read_output();
-        printf("ADC output: %u\n", adc_output);
+        // Trigger an ADC read.
+        printf("Triggering ADC.\n");
+        adc_trigger();
+        while (!g_adc_output.valid) {
+        }
+        if (!g_adc_output.valid) {
+            printf("ADC output should be valid.\n");
+        }
+        printf("ADC output: %u\n", g_adc_output.data);
 
-        // Wait for the next ADC read.
-        for (size_t i = 0; i < NUM_CYCLES_BETWEEN_ADC_READS; ++i) {
+        // Wait a bit.
+        for (uint32_t i = 0; i < 1000000; ++i) {
         }
     }
 }

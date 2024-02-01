@@ -5,10 +5,11 @@
 
   <Header>### uVision Project, (C) Keil Software</Header>
 
-  <WorkspaceName>WorkSpace</WorkspaceName>
+  <WorkspaceName>D:\Work\atomic\lighthouse_position\reference\scum-test-code\scm_v3c\applications\all_projects.uvmpw</WorkspaceName>
 
   <project>
     <PathAndName>.\sensor_adc\sensor_adc.uvprojx</PathAndName>
+    <NodeIsExpanded>1</NodeIsExpanded>
     <NodeIsCheckedInBatchBuild>1</NodeIsCheckedInBatchBuild>
   </project>
 
@@ -19,6 +20,7 @@
 
   <project>
     <PathAndName>.\freq_sweep_tx_simple\freq_sweep_tx_simple.uvprojx</PathAndName>
+    <NodeIsExpanded>1</NodeIsExpanded>
     <NodeIsCheckedInBatchBuild>1</NodeIsCheckedInBatchBuild>
   </project>
 
@@ -78,7 +80,12 @@
 
   <project>
     <PathAndName>.\channel_cal\channel_cal.uvprojx</PathAndName>
+  </project>
+
+  <project>
+    <PathAndName>.\synclight_carlibration\synclight_calibration.uvprojx</PathAndName>
     <NodeIsActive>1</NodeIsActive>
+    <NodeIsExpanded>1</NodeIsExpanded>
   </project>
 
 </ProjectWorkspace>

@@ -7,7 +7,7 @@
 
   <Targets>
     <Target>
-      <TargetName>channel_cal</TargetName>
+      <TargetName>synclight_calibration</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
       <pArmCC>5060960::V5.06 update 7 (build 960)::.\ARMCOMPILER5</pArmCC>
@@ -50,7 +50,7 @@
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
           <OutputDirectory>.\Objects\</OutputDirectory>
-          <OutputName>channel_cal</OutputName>
+          <OutputName>synclight_calibration</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
           <CreateHexFile>1</CreateHexFile>
@@ -83,8 +83,8 @@
           <AfterMake>
             <RunUserProg1>1</RunUserProg1>
             <RunUserProg2>1</RunUserProg2>
-            <UserProg1Name>fromelf --bin .\Objects\channel_cal.axf -o .\Objects\channel_cal.bin</UserProg1Name>
-            <UserProg2Name>fromelf -cvf .\Objects\channel_cal.axf -o .\Objects\disasm.txt</UserProg2Name>
+            <UserProg1Name>fromelf --bin .\Objects\synclight_calibration.axf -o .\Objects\synclight_calibration.bin</UserProg1Name>
+            <UserProg2Name>fromelf -cvf .\Objects\synclight_calibration.axf -o .\Objects\disasm.txt</UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
             <nStopA1X>0</nStopA1X>
@@ -327,7 +327,7 @@
             <wLevel>2</wLevel>
             <uThumb>0</uThumb>
             <uSurpInc>0</uSurpInc>
-            <uC99>1</uC99>
+            <uC99>0</uC99>
             <uGnu>0</uGnu>
             <useXO>0</useXO>
             <v6Lang>1</v6Lang>
@@ -341,7 +341,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>../../</IncludePath>
+              <IncludePath>../../;..\synclight_carlibration</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -354,7 +354,7 @@
             <NoWarn>0</NoWarn>
             <uSurpInc>0</uSurpInc>
             <useXO>0</useXO>
-            <ClangAsOpt>4</ClangAsOpt>
+            <ClangAsOpt>1</ClangAsOpt>
             <VariousControls>
               <MiscControls></MiscControls>
               <Define></Define>
@@ -372,7 +372,7 @@
             <TextAddressRange>0x00000000</TextAddressRange>
             <DataAddressRange>0x20000000</DataAddressRange>
             <pXoBase></pXoBase>
-            <ScatterFile>channel_cal.sct</ScatterFile>
+            <ScatterFile>hello_world.sct</ScatterFile>
             <IncludeLibs></IncludeLibs>
             <IncludeLibsPath></IncludeLibsPath>
             <Misc></Misc>
@@ -386,19 +386,9 @@
           <GroupName>app</GroupName>
           <Files>
             <File>
-              <FileName>channel_cal.c</FileName>
+              <FileName>synclight_calibration.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\channel_cal.c</FilePath>
-            </File>
-            <File>
-              <FileName>channel_cal_main.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\channel_cal_main.c</FilePath>
-            </File>
-            <File>
-              <FileName>channel_cal.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\channel_cal.h</FilePath>
+              <FilePath>.\synclight_calibration.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -496,24 +486,14 @@
               <FilePath>..\..\scm3c_hw_interface.c</FilePath>
             </File>
             <File>
-              <FileName>ieee_802_15_4.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\..\ieee_802_15_4.h</FilePath>
-            </File>
-            <File>
-              <FileName>ieee_802_15_4.c</FileName>
+              <FileName>calibrate_interrupt.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\ieee_802_15_4.c</FilePath>
+              <FilePath>..\..\calibrate_interrupt.c</FilePath>
             </File>
             <File>
-              <FileName>tuning.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\tuning.c</FilePath>
-            </File>
-            <File>
-              <FileName>tuning.h</FileName>
+              <FileName>calibrate_interrupt.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\tuning.h</FilePath>
+              <FilePath>..\..\calibrate_interrupt.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -573,7 +553,7 @@
   <LayerInfo>
     <Layers>
       <Layer>
-        <LayName>channel_cal</LayName>
+        <LayName>synclight_calibration</LayName>
         <LayPrjMark>1</LayPrjMark>
       </Layer>
     </Layers>

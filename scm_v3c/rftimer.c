@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "Memory_Map.h"
+#include "gpio.h"
 #include "radio.h"
 #include "scm3c_hw_interface.h"
 
@@ -182,6 +183,8 @@ void rftimer_isr(void) {
     int i = 0;
     int interrupt_id = 1;
 
+    gpio_2_set();
+
     interrupt = RFTIMER_REG__INT;
 
     for (i = 0; i < 8; i++) {
@@ -245,6 +248,8 @@ void rftimer_isr(void) {
     }
 
     RFTIMER_REG__INT_CLEAR = interrupt;
+
+    gpio_2_clr();
 }
 
 void handle_interrupt(uint8_t id) {
