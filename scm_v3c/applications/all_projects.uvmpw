@@ -5,7 +5,7 @@
 
   <Header>### uVision Project, (C) Keil Software</Header>
 
-  <WorkspaceName>D:\Work\atomic\lighthouse_position\reference\scum-test-code\scm_v3c\applications\all_projects.uvmpw</WorkspaceName>
+  <WorkspaceName>D:\Work\atomic\lighthouse_position\develop_sync_clock\dev\scum-test-code\scm_v3c\applications\all_projects.uvmpw</WorkspaceName>
 
   <project>
     <PathAndName>.\sensor_adc\sensor_adc.uvprojx</PathAndName>

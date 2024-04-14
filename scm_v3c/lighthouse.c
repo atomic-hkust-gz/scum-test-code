@@ -54,9 +54,11 @@ void initialize_mote_lighthouse() {
     // GPI_control(0,0,0,0);
 
     // set gpi interrupts
+    // 这里将GPI 8-11设置为bank1,其余bank 0,bank1功能似乎是外部中断，8,9,10--INT123
     GPI_control(0, 0, 1, 0);
 
-    // Select banks for GPIO outputs
+    // Select banks for GPIO outputs    
+    // 4-7是标准GPIO输出 
     GPO_control(0, 6, 0, 0);
 
     // set optical pin input
