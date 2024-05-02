@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <string.h>
-
+#include <string.h> 
+#include <gpio.h>
 #include "memory_map.h"
 #include "radio.h"
 #include "scm3c_hw_interface.h"
@@ -27,6 +27,7 @@ typedef struct {
 
 optical_vars_t optical_vars;
 
+extern int8_t need_optical;
 //=========================== prototypes ======================================
 
 //=========================== public ==========================================
@@ -94,6 +95,10 @@ void optical_32_isr(void) {
 // optical data transfer Need to make sure a new bit has been clocked in prior
 // to returning from this ISR, or else it will immediately execute again
 void optical_sfd_isr(void) {
+  switch(need_optical)
+{
+    case 1:
+    {
     // 1.1V/VDDD tap fix
     // helps reorder assembly code
     // Not completely sure why this works
@@ -287,4 +292,14 @@ void optical_sfd_isr(void) {
         // Halt all counters
         ANALOG_CFG_REG__0 = 0x0000;
     }
+  }
+    break;
+    case 0:
+      {
+    printf("light_detected!\r\n");
+    }
+      break;
+    default:
+      break;
+  }
 }

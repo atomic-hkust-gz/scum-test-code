@@ -22,7 +22,7 @@
 
 //=========================== public ==========================================
 
-void calibration_isr();
+void calibration_isr(void);
 void gpio_ext_3_interrupt_enable(void);
 void gpio_ext_3_interrupt_disable(void);
 void gpio_ext_9_interrupt_enable(void);
