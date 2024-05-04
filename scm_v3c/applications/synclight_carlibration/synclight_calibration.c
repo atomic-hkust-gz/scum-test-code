@@ -2,6 +2,7 @@
 
 #include "calibrate_interrupt.h"
 #include "gpio.h"
+#include "lighthouse_position.h"
 #include "memory_map.h"
 #include "optical.h"
 #include "scm3c_hw_interface.h"
@@ -14,9 +15,13 @@
 #define CALIBRATE_SYNCLIGHT_INPUT 8  // receive sync light on this pin
 #define CALIBRATE_OUTPUT \
     10  // toggle this pin to show scum received a sync light
-#define OPTICAL_DATA_RAW_PIN 3           // optical receiver digital data pin
-#define OPTICAL_DATA_RAW_PIN_HEX 0x0008  // optical receiver digital data pin
+//#define OPTICAL_DATA_RAW_PIN \
+//    ((0x0008 & GPIO_REG__INPUT) >> 3)// optical receiver digital data pin
 
+//// indicate the type of light
+// #define type_sync 0
+// #define type_sweep 1
+// #define type_skip_sync 2
 //=========================== variables =======================================
 
 typedef struct {
@@ -29,10 +34,6 @@ extern int8_t need_optical;
 
 int t;
 
-// Variables for lighthouse RX
-unsigned short current_gpio = 0, last_gpio = 0, state = 0, nextstate = 0,
-               pulse_type = 0;
-unsigned int timestamp_rise, timestamp_fall, pulse_width;
 //=========================== prototypes ======================================
 
 //=========================== main ============================================
@@ -69,7 +70,7 @@ int main(void) {
     // clean optical and ex3 interrupt, then re-open ext_3 interrupt
     need_optical = 0;
     //		enable extern interrupts and first clean EXT_8 and optical
-    //interrupt
+    // interrupt
     //    ICER = 0x1800;
     //		set the ISER to 0x1000,only gpio
     //    ISER = 0x1000;
@@ -89,7 +90,7 @@ int main(void) {
     analog_scan_chain_write();
     analog_scan_chain_load();
 
-    ICER = 0xFFFF;
+//    ICER = 0xFFFF;
     //	gpio_3_set();
     //	gpio_8_set();
     //	gpio_9_set();
@@ -99,70 +100,29 @@ int main(void) {
 
     // from lighthouse..c
 
-    // Set HCLK source as HF_CLOCK
-    set_asc_bit(1147);
+//    // Set HCLK source as HF_CLOCK
+//    set_asc_bit(1147);
 
-    // Set initial coarse/fine on HF_CLOCK
+//    // Set initial coarse/fine on HF_CLOCK
 
-    set_sys_clk_secondary_freq(3, 17);
+//    set_sys_clk_secondary_freq(3, 17);
 
-    // Set RFTimer source as HF_CLOCK
-    set_asc_bit(1151);
+//    // Set RFTimer source as HF_CLOCK
+//    set_asc_bit(1151);
 
-    // Disable LF_CLOCK
-    set_asc_bit(553);
+//    // Disable LF_CLOCK
+//    set_asc_bit(553);
 
     analog_scan_chain_write();
     analog_scan_chain_load();
 
     printf("~~~~start to say HELLO?~~~~~%d\n", app_vars.count);
     while (1) {
-        //        printf("Hello World! %d\n", app_vars.count);
-        //        app_vars.count += 1;
+        printf("Hello World! %d\n", app_vars.count);
+        app_vars.count += 1;
 
-        //        for (i = 0; i < 1000000; i++)
-        //            ;
-        // lighthouse code start
-        last_gpio = current_gpio;
-        current_gpio = (OPTICAL_DATA_RAW_PIN_HEX & GPIO_REG__INPUT) >>
-                       OPTICAL_DATA_RAW_PIN;
-        // Update to next FSM state
-        state = nextstate;
-
-        // Detect rising edge
-        if (last_gpio == 0 && current_gpio == 1) {
-            // Reset RF Timer count register at rising edge of first sync pulse
-            // if(state == 0) RFTIMER_REG__COUNTER = 0x0;
-
-            // Save when this event happened
-            timestamp_rise = RFTIMER_REG__COUNTER;
-
-        }
-
-        // Detect falling edge
-        else if (last_gpio == 1 && current_gpio == 0) {
-            // Save when this event happened
-            timestamp_fall = RFTIMER_REG__COUNTER;
-
-            // Calculate how wide this pulse was
-            // pulse_width = timestamp_fall - timestamp_rise;
-            pulse_width = timestamp_fall - timestamp_rise;
-            // printf("Pulse Type, Width:%d,
-            // %d\n",classify_pulse(timestamp_rise,
-            // timestamp_fall),pulse_width);
-
-            // Need to determine what kind of pulse this was
-            // Laser sweep pulses will have widths of only a few us
-            // Sync pulses have a width corresponding to
-            // 62.5 us - azimuth   - data=0 (625 ticks of 10MHz clock)
-            // 72.9 us - elevation - data=0 (729 ticks)
-            // 83.3 us - azimuth   - data=1 (833 ticks)
-            // 93.8 us - elevation - data=0 (938 ticks)
-            // A second lighthouse can be distinguished by differences in these
-            // pulse widths
-            update_state(classify_pulse(timestamp_rise, timestamp_fall),
-                         timestamp_rise);
-        }
+        for (i = 0; i < 1000000; i++)
+            ;
     }
 }
 

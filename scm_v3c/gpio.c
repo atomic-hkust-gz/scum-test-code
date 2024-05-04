@@ -99,7 +99,7 @@ void ext_gpio8_activehigh_isr() {
     break;
     case 0:
       sync_light_calibrate_isr();
-printf("Sync_light_detected!\r\n");
+//printf("Sync_light_detected!\r\n");
     break;
     default:
       break;

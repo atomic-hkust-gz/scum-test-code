@@ -496,9 +496,9 @@
               <FilePath>..\..\calibrate_interrupt.h</FilePath>
             </File>
             <File>
-              <FileName>lighthouse.c</FileName>
+              <FileName>lighthouse_position.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\..\..\reference\scum-test-code\scm_v3c\lighthouse.c</FilePath>
+              <FilePath>..\..\lighthouse_position.c</FilePath>
             </File>
           </Files>
         </Group>
