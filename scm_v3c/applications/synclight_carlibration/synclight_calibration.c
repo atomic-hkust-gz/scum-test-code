@@ -22,8 +22,9 @@
 #define type_sweep 1
 #define type_skip_sync 2
 
+//=========================== variables ===========================
 
-    typedef struct {
+typedef struct {
     uint8_t count;
 } app_vars_t;
 
@@ -57,6 +58,11 @@ uint32_t A_X = 0;
 uint32_t A_Y = 0;
 uint32_t B_X = 0;
 uint32_t B_Y = 0;
+// save last location message
+uint32_t last_A_X = 0;
+uint32_t last_A_Y = 0;
+uint32_t last_B_X = 0;
+uint32_t last_B_Y = 0;
 //=========================== prototypes ======================================
 void config_lighthouse_mote(void) {
     //  I think RF timer needs to be reset before use, but not essential.
@@ -67,16 +73,56 @@ void config_lighthouse_mote(void) {
 
     // Select banks for GPIO inputs
     GPI_control(0, 0, 0, 0);
-    // Select banks for GPIO outputs, now IO 10 is used for test(XX6X) 
+    // Select banks for GPIO outputs, now IO 8,10 is used for test(XX6X)
     GPO_control(0, 0, 6, 0);
     // Set all GPIOs as outputs
     GPI_enables(0x000F);  // 0008=io3?
     GPO_enables(0xFFFF);
+  
+  // Set RFTimer source as HF_CLOCK
+    set_asc_bit(1151);
+
+    // Disable LF_CLOCK
+    set_asc_bit(553);
+
+    // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
+    // 10MHz (inverted, so 0000 0010-->1111 1101)
+    set_asc_bit(49);
+    set_asc_bit(48);
+    set_asc_bit(47);
+    set_asc_bit(46);
+    set_asc_bit(45);
+    set_asc_bit(44);
+    clear_asc_bit(43);
+    set_asc_bit(42);
+//    how about 1M?(20,0001 0100->1110 1011)
+//    set_asc_bit(49);
+//    set_asc_bit(48);
+//    set_asc_bit(47);
+//    clear_asc_bit(46);
+//    set_asc_bit(45);
+//    clear_asc_bit(44);
+//    set_asc_bit(43);
+//    set_asc_bit(42);
+    // Set 2M RC as source for chip CLK
+    set_asc_bit(1156);
+
+    // Enable 32k for cal
+    set_asc_bit(623);
+
+    // Enable passthrough on chip CLK divider
+    set_asc_bit(41);
+
+    // Init counter setup - set all to analog_cfg control
+    // scm3c_hw_interface_vars.ASC[0] is leftmost
+    // scm3c_hw_interface_vars.ASC[0] |= 0x6F800000;
+    for (t = 2; t < 9; t++) set_asc_bit(t);
 
     analog_scan_chain_write();
     analog_scan_chain_load();
 }
-
+//divide timer then multiply it to make codecompatible
+int para_temp = 1;
 void decode_lighthouse(void) {
     // This is the main function of lighthouse protocol decoding
     // lighthouse code start
@@ -91,8 +137,9 @@ void decode_lighthouse(void) {
         // if(state == 0) RFTIMER_REG__COUNTER = 0x0;
 
         // Save when this event happened
-        timestamp_rise = RFTIMER_REG__COUNTER;
-      gpio_10_toggle();
+        timestamp_rise = RFTIMER_REG__COUNTER * para_temp;
+//      only for debugging
+        gpio_10_toggle();
         switch (flag_start) {
             case 0:
                 t_0_start = timestamp_rise;
@@ -110,11 +157,12 @@ void decode_lighthouse(void) {
     // Detect falling edge
     else if (last_gpio == 1 && current_gpio == 0) {
         // Save when this event happened
-        timestamp_fall = RFTIMER_REG__COUNTER;
+        timestamp_fall = RFTIMER_REG__COUNTER * para_temp;
 
         // Calculate how wide this pulse was
         pulse_width = timestamp_fall - timestamp_rise;
-      gpio_10_toggle();
+        gpio_10_toggle();
+//      gpio_8_toggle();
 
         // Need to determine what kind of pulse this was
         // Laser sweep pulses will have widths of only a few us
@@ -138,7 +186,7 @@ void decode_lighthouse(void) {
                 t_opt_pulse = t_0_end - t_0_start;
                 // Dividing the two signals by 50us: 0.000,050/(1/10M) = 500
                 // = 0x320,99us(990ticks) for skip/sync
-                    (t_opt_pulse < 500)
+                (t_opt_pulse < 500)
                     ? (flag_light_type = type_sweep)
                     : ((t_opt_pulse < 990)
                            ? (flag_light_type = type_sync)
@@ -154,7 +202,7 @@ void decode_lighthouse(void) {
                         t_d_start = t_0_start;
                         // It is only based on sweep that you can determine
                         // whether you are currently in A or B.
-                            if (flag_station >= 1) {
+                        if (flag_station >= 1) {
                             //  Where an even ten digit number is the
                             //  X-axis, an odd number is the Y-axis.
                             ((t_opt_pulse_us / 10) % 2 == 0) ? (loca_x = 1)
@@ -162,7 +210,7 @@ void decode_lighthouse(void) {
                         }
                         // Determine whether this is an A or B base station
                         // based on the value of flag_station
-                            switch (flag_station) {
+                        switch (flag_station) {
                             case 0:
                                 break;
                             case 1:
@@ -176,6 +224,7 @@ void decode_lighthouse(void) {
                         }
                         break;
                     case type_sweep:
+                      gpio_8_toggle();
                         //  0 ：NULL,1: next is A,2:next is B
                         flag_station = 1;
 
@@ -211,7 +260,7 @@ void decode_lighthouse(void) {
                             flag_station++;
                             // Exceeding 2 means that a sweep was not seen,
                             // which often happens.
-                                if (flag_station >= 3) {
+                            if (flag_station >= 3) {
                                 flag_station--;
                             }
                         }
@@ -224,7 +273,8 @@ void decode_lighthouse(void) {
                 break;
         }
         // lighthouse_positioning_protocol_decoding();
-//        printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
+        //        printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
+        //        B_Y);
     }
 }
 //=========================== main ============================================
@@ -247,16 +297,34 @@ int main(void) {
     need_optical = 0;
 
     // disable all interrupts
-  ICER = 0xFFFF;
-  
+    ICER = 0xFFFF;
 
     printf("~~~~start to say HELLO?~~~~~%d\n", app_vars.count);
+//  here is the timecounter to control print velocity
+  i = 0;
     while (1) {
         decode_lighthouse();
-//      printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
-//      printf("current gpio: %d\n", current_gpio);
-//        printf("Hello World! %d\n", app_vars.count);
-//        app_vars.count += 1;
+//      wait some time then print to uart
+      i++;
+      if (i==100000){
+      i = 0;
+        printf("opt_pulse: %u, interval: %u\n", t_opt_pulse, loca_duration);
+//        printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
+      }
+//      printf("fall: %u, rise: %u\n",timestamp_fall, timestamp_rise);
+        // print to uart after an entire XY.
+//        if ((last_A_X != A_X || last_A_Y != A_Y) ||
+//            (last_B_X != B_X && last_B_Y != B_Y)) {
+//            last_A_X = A_X;
+//            last_A_Y = A_Y;
+//            last_B_X = B_X;
+//            last_B_Y = B_Y;
+//            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
+//        }
+        //      printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
+        //      B_Y); printf("current gpio: %d\n", current_gpio);
+        //        printf("Hello World! %d\n", app_vars.count);
+        //        app_vars.count += 1;
 
         // for (i = 0; i < 1000000; i++);
     }
