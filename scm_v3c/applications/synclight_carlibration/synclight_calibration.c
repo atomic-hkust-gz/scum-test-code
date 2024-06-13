@@ -78,8 +78,8 @@ void config_lighthouse_mote(void) {
     // Set all GPIOs as outputs
     GPI_enables(0x000F);  // 0008=io3?
     GPO_enables(0xFFFF);
-  
-  // Set RFTimer source as HF_CLOCK
+
+    // Set RFTimer source as HF_CLOCK
     set_asc_bit(1151);
 
     // Disable LF_CLOCK
@@ -95,15 +95,15 @@ void config_lighthouse_mote(void) {
     set_asc_bit(44);
     clear_asc_bit(43);
     set_asc_bit(42);
-//    how about 1M?(20,0001 0100->1110 1011)
-//    set_asc_bit(49);
-//    set_asc_bit(48);
-//    set_asc_bit(47);
-//    clear_asc_bit(46);
-//    set_asc_bit(45);
-//    clear_asc_bit(44);
-//    set_asc_bit(43);
-//    set_asc_bit(42);
+    //    how about 1M?(20,0001 0100->1110 1011)
+    //    set_asc_bit(49);
+    //    set_asc_bit(48);
+    //    set_asc_bit(47);
+    //    clear_asc_bit(46);
+    //    set_asc_bit(45);
+    //    clear_asc_bit(44);
+    //    set_asc_bit(43);
+    //    set_asc_bit(42);
     // Set 2M RC as source for chip CLK
     set_asc_bit(1156);
 
@@ -121,8 +121,43 @@ void config_lighthouse_mote(void) {
     analog_scan_chain_write();
     analog_scan_chain_load();
 }
-//divide timer then multiply it to make codecompatible
+// a method used to replace old xy distinguish method from kilberg code.
+#define WIDTH_BIAS (0 - 0)
+void distinguish_xy(uint32_t light_duration) {
+    // Identify what kind of pulse this was
+
+    // if (light_duration < 585 + WIDTH_BIAS && light_duration > 100 +
+    // WIDTH_BIAS)
+    //     loca_x = LASER;  // Laser sweep (THIS NEEDS TUNING)
+    if (light_duration < 410 + WIDTH_BIAS && light_duration > 340 + WIDTH_BIAS)
+        loca_x = 1;  // Azimuth sync, data=0, skip = 0
+    if (light_duration >= 410 + WIDTH_BIAS && light_duration < 480 + WIDTH_BIAS)
+        loca_x = 0;  // Elevation sync, data=0, skip = 0
+    if (light_duration >= 480 + WIDTH_BIAS && light_duration < 550 + WIDTH_BIAS)
+        loca_x = 1;  // Azimuth sync, data=1, skip = 0
+    if (light_duration >= 550 + WIDTH_BIAS && light_duration < 989 + WIDTH_BIAS)
+        loca_x = 0;  // Elevation sync, data=1, skip = 0
+    // if (light_duration >= 989 + WIDTH_BIAS && light_duration < 1083 +
+    // WIDTH_BIAS)
+    //     pulse_type = AZ_SKIP;  // Azimuth sync, data=0, skip = 1
+    // if (light_duration >= 1083 + WIDTH_BIAS && light_duration < 1200 +
+    // WIDTH_BIAS)
+    //     pulse_type = EL_SKIP;  // elevation sync, data=0, skip = 1
+    // if (light_duration >= 1200 + WIDTH_BIAS && light_duration < 1300 +
+    // WIDTH_BIAS)
+    //     pulse_type = AZ_SKIP;  // Azimuth sync, data=1, skip = 1
+    // if (light_duration >= 1300 + WIDTH_BIAS && light_duration < 1400 +
+    // WIDTH_BIAS)
+    //     pulse_type = EL_SKIP;  // Elevation sync, data=1, skip = 1
+}
+// some debug vars, canbe deleted later
+// divide timer then multiply it to make codecompatible
 int para_temp = 1;
+int tmp_count_sweep = 0;
+int tmp_count_sync = 0;
+int tmp_count_skip = 0;
+uint32_t tmp_sync_width = 0;
+
 void decode_lighthouse(void) {
     // This is the main function of lighthouse protocol decoding
     // lighthouse code start
@@ -138,7 +173,7 @@ void decode_lighthouse(void) {
 
         // Save when this event happened
         timestamp_rise = RFTIMER_REG__COUNTER * para_temp;
-//      only for debugging
+        //      only for debugging
         gpio_10_toggle();
         switch (flag_start) {
             case 0:
@@ -162,7 +197,7 @@ void decode_lighthouse(void) {
         // Calculate how wide this pulse was
         pulse_width = timestamp_fall - timestamp_rise;
         gpio_10_toggle();
-//      gpio_8_toggle();
+        //      gpio_8_toggle();
 
         // Need to determine what kind of pulse this was
         // Laser sweep pulses will have widths of only a few us
@@ -186,7 +221,8 @@ void decode_lighthouse(void) {
                 t_opt_pulse = t_0_end - t_0_start;
                 // Dividing the two signals by 50us: 0.000,050/(1/10M) = 500
                 // = 0x320,99us(990ticks) for skip/sync
-                (t_opt_pulse < 500)
+                (t_opt_pulse <
+                 350)  // actual boundary condition maybe a little different
                     ? (flag_light_type = type_sweep)
                     : ((t_opt_pulse < 990)
                            ? (flag_light_type = type_sync)
@@ -197,6 +233,8 @@ void decode_lighthouse(void) {
                     // falling edge interrupt will need to calculate
                     // position
                     case type_sync:
+                        tmp_count_sync++;              // debug,remove later
+                        tmp_sync_width = t_opt_pulse;  // debug, remove later
                         // If sync, distance measurement starts from this
                         // time.
                         t_d_start = t_0_start;
@@ -205,8 +243,13 @@ void decode_lighthouse(void) {
                         if (flag_station >= 1) {
                             //  Where an even ten digit number is the
                             //  X-axis, an odd number is the Y-axis.
-                            ((t_opt_pulse_us / 10) % 2 == 0) ? (loca_x = 1)
-                                                             : (loca_x = 0);
+                            // offcourse ,but scum not very accurate, I should
+                            // replace it with another medthod to distinguish XY
+                            // ((t_opt_pulse_us / 10) % 2 == 0) ? (loca_x = 1)
+                            //                                  : (loca_x = 0);
+
+                            // update loca_x
+                            distinguish_xy(t_opt_pulse);
                         }
                         // Determine whether this is an A or B base station
                         // based on the value of flag_station
@@ -224,7 +267,8 @@ void decode_lighthouse(void) {
                         }
                         break;
                     case type_sweep:
-                      gpio_8_toggle();
+                        gpio_8_toggle();
+                        tmp_count_sweep++;  // debug,remove later
                         //  0 ：NULL,1: next is A,2:next is B
                         flag_station = 1;
 
@@ -256,6 +300,7 @@ void decode_lighthouse(void) {
 
                         break;
                     case type_skip_sync:
+                        tmp_count_skip++;  // debug,remove later
                         if (flag_station >= 1) {
                             flag_station++;
                             // Exceeding 2 means that a sweep was not seen,
@@ -300,29 +345,43 @@ int main(void) {
     ICER = 0xFFFF;
 
     printf("~~~~start to say HELLO?~~~~~%d\n", app_vars.count);
-//  here is the timecounter to control print velocity
-  i = 0;
+    //  here is the timecounter to control print velocity
+    i = 0;
     while (1) {
         decode_lighthouse();
-//      wait some time then print to uart
-      i++;
-      if (i==100000){
-      i = 0;
-        printf("opt_pulse: %u, interval: %u\n", t_opt_pulse, loca_duration);
-//        printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
-      }
-//      printf("fall: %u, rise: %u\n",timestamp_fall, timestamp_rise);
+        //      wait some time then print to uart
+        i++;
+        if (i == 100000) {
+            i = 0;
+            // printf("syc: %u\n", tmp_sync_width);
+
+            // printf("opt_pulse: %u, interval: %u\n",
+            // t_opt_pulse,loca_duration);
+
+            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
+
+            //  printf("syc: %u, skp: %u, swp: %u\n",
+            //  tmp_count_sync,tmp_count_skip, tmp_count_sweep);
+            tmp_count_skip = 0;
+            tmp_count_sweep = 0;
+            tmp_count_sync = 0;
+        }
+        //      printf("fall: %u, rise: %u\n",timestamp_fall, timestamp_rise);
         // print to uart after an entire XY.
-//        if ((last_A_X != A_X || last_A_Y != A_Y) ||
-//            (last_B_X != B_X && last_B_Y != B_Y)) {
-//            last_A_X = A_X;
-//            last_A_Y = A_Y;
-//            last_B_X = B_X;
-//            last_B_Y = B_Y;
-//            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
-//        }
+        //        if ((last_A_X != A_X || last_A_Y != A_Y) ||
+        //            (last_B_X != B_X && last_B_Y != B_Y)) {
+        //            last_A_X = A_X;
+        //            last_A_Y = A_Y;
+        //            last_B_X = B_X;
+        //            last_B_Y = B_Y;
+        //            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y,
+        //            B_X, B_Y);
+        //        }
         //      printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
-        //      B_Y); printf("current gpio: %d\n", current_gpio);
+        //      B_Y);
+
+        // printf("current gpio: %d\n", current_gpio);
+
         //        printf("Hello World! %d\n", app_vars.count);
         //        app_vars.count += 1;
 
