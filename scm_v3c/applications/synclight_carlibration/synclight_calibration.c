@@ -79,6 +79,9 @@ void config_lighthouse_mote(void) {
     GPI_enables(0x000F);  // 0008=io3?
     GPO_enables(0xFFFF);
 
+    // Set HCLK source as HF_CLOCK
+    set_asc_bit(1147);
+
     // Set RFTimer source as HF_CLOCK
     set_asc_bit(1151);
 
@@ -87,14 +90,39 @@ void config_lighthouse_mote(void) {
 
     // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
     // 10MHz (inverted, so 0000 0010-->1111 1101)
-    set_asc_bit(49);
-    set_asc_bit(48);
-    set_asc_bit(47);
-    set_asc_bit(46);
-    set_asc_bit(45);
-    set_asc_bit(44);
-    clear_asc_bit(43);
-    set_asc_bit(42);
+    // set_asc_bit(49);
+    // set_asc_bit(48);
+    // set_asc_bit(47);
+    // set_asc_bit(46);
+    // set_asc_bit(45);
+    // set_asc_bit(44);
+    // clear_asc_bit(43);
+    // set_asc_bit(42);
+
+    // is RF timer in 10M when this value is 2?
+    // set_asc_bit(49);
+    // set_asc_bit(48);
+    // set_asc_bit(47);
+    // set_asc_bit(46);
+    // set_asc_bit(45);
+    // set_asc_bit(44);
+    // set_asc_bit(43);
+    // clear_asc_bit(42);
+
+    // try to use divider on HFCLK
+    // Set HCLK divider to 2
+    clear_asc_bit(57);
+    clear_asc_bit(56);
+    clear_asc_bit(55);
+    clear_asc_bit(54);
+    clear_asc_bit(53);
+    set_asc_bit(52);  // inverted
+    set_asc_bit(51);
+    clear_asc_bit(50);
+
+    // Set RF Timer divider to pass through so that RF Timer is 20 MHz
+//    set_asc_bit(36);
+
     //    how about 1M?(20,0001 0100->1110 1011)
     //    set_asc_bit(49);
     //    set_asc_bit(48);
@@ -353,12 +381,13 @@ int main(void) {
         i++;
         if (i == 100000) {
             i = 0;
-            // printf("syc: %u\n", tmp_sync_width);
+            printf("syc: %u\n", tmp_sync_width);
 
             // printf("opt_pulse: %u, interval: %u\n",
             // t_opt_pulse,loca_duration);
 
-            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
+            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
+            // B_Y);
 
             //  printf("syc: %u, skp: %u, swp: %u\n",
             //  tmp_count_sync,tmp_count_skip, tmp_count_sweep);
