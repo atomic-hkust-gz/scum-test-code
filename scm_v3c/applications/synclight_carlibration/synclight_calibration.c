@@ -5,6 +5,7 @@
 #include "lighthouse_position.h"
 #include "memory_map.h"
 #include "optical.h"
+#include "rftimer.h"
 #include "scm3c_hw_interface.h"
 
 //=========================== defines =========================================
@@ -80,7 +81,7 @@ void config_lighthouse_mote(void) {
     GPO_enables(0xFFFF);
 
     // Set HCLK source as HF_CLOCK
-    set_asc_bit(1147);
+    // set_asc_bit(1147);
 
     // Set RFTimer source as HF_CLOCK
     set_asc_bit(1151);
@@ -90,38 +91,59 @@ void config_lighthouse_mote(void) {
 
     // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
     // 10MHz (inverted, so 0000 0010-->1111 1101)
+    set_asc_bit(49);
+    set_asc_bit(48);
+    set_asc_bit(47);
+    set_asc_bit(46);
+    set_asc_bit(45);
+    set_asc_bit(44);
+    clear_asc_bit(43);
+    set_asc_bit(42);
+
+    // div =4
+    set_asc_bit(49);
+    set_asc_bit(48);
+    set_asc_bit(47);
+    set_asc_bit(46);
+    set_asc_bit(45);
+    clear_asc_bit(44);
+    set_asc_bit(43);
+    set_asc_bit(42);
+
+    // is RF timer in 500k when this value is 40?
+    // set_asc_bit(49);
+    // set_asc_bit(48);
+    // clear_asc_bit(47);
+    // set_asc_bit(46);
+    // clear_asc_bit(45);
+    // set_asc_bit(44);
+    // set_asc_bit(43);
+    // set_asc_bit(42);
+
+    // this is 2M,div = 10
     // set_asc_bit(49);
     // set_asc_bit(48);
     // set_asc_bit(47);
     // set_asc_bit(46);
-    // set_asc_bit(45);
+    // clear_asc_bit(45);
     // set_asc_bit(44);
     // clear_asc_bit(43);
     // set_asc_bit(42);
 
-    // is RF timer in 10M when this value is 2?
-    // set_asc_bit(49);
-    // set_asc_bit(48);
-    // set_asc_bit(47);
-    // set_asc_bit(46);
-    // set_asc_bit(45);
-    // set_asc_bit(44);
-    // set_asc_bit(43);
-    // clear_asc_bit(42);
-
     // try to use divider on HFCLK
     // Set HCLK divider to 2
-    clear_asc_bit(57);
-    clear_asc_bit(56);
-    clear_asc_bit(55);
-    clear_asc_bit(54);
-    clear_asc_bit(53);
-    set_asc_bit(52);  // inverted
-    set_asc_bit(51);
-    clear_asc_bit(50);
+    // clear_asc_bit(57);
+    // clear_asc_bit(56);
+    // clear_asc_bit(55);
+    // clear_asc_bit(54);
+    // clear_asc_bit(53);
+    // set_asc_bit(52);  // inverted
+    // set_asc_bit(51);
+    // clear_asc_bit(50);
 
-    // Set RF Timer divider to pass through so that RF Timer is 20 MHz
-//    set_asc_bit(36);
+    // Set RF Timer divider to pass through so that RF Timer is 20 MHz,
+    //  passthrough means ignore the divider.
+    set_asc_bit(36);
 
     //    how about 1M?(20,0001 0100->1110 1011)
     //    set_asc_bit(49);
@@ -132,19 +154,20 @@ void config_lighthouse_mote(void) {
     //    clear_asc_bit(44);
     //    set_asc_bit(43);
     //    set_asc_bit(42);
+
     // Set 2M RC as source for chip CLK
-    set_asc_bit(1156);
+    // set_asc_bit(1156);
 
     // Enable 32k for cal
-    set_asc_bit(623);
+    // set_asc_bit(623);
 
     // Enable passthrough on chip CLK divider
-    set_asc_bit(41);
+    // set_asc_bit(41);
 
     // Init counter setup - set all to analog_cfg control
     // scm3c_hw_interface_vars.ASC[0] is leftmost
     // scm3c_hw_interface_vars.ASC[0] |= 0x6F800000;
-    for (t = 2; t < 9; t++) set_asc_bit(t);
+    // for (t = 2; t < 9; t++) set_asc_bit(t);
 
     analog_scan_chain_write();
     analog_scan_chain_load();
@@ -358,7 +381,6 @@ int main(void) {
     memset(&app_vars, 0, sizeof(app_vars_t));
 
     printf("Initializing...");
-    // config_lighthouse_mote();
     initialize_mote();
     crc_check();
     perform_calibration();
@@ -370,31 +392,39 @@ int main(void) {
     need_optical = 0;
 
     // disable all interrupts
-    ICER = 0xFFFF;
+    //    ICER = 0xFFFF;
+
+    //  test rftimer
+    ISER = 0x0080;
 
     printf("~~~~start to say HELLO?~~~~~%d\n", app_vars.count);
+
+    delay_milliseconds_asynchronous(1000, 7);
     //  here is the timecounter to control print velocity
     i = 0;
     while (1) {
-        decode_lighthouse();
+        //        decode_lighthouse();
         //      wait some time then print to uart
-        i++;
-        if (i == 100000) {
-            i = 0;
-            printf("syc: %u\n", tmp_sync_width);
+        //        i++;
+        //
+        //        if (i == 100000) {
+        //            i = 0;
+        //            // printf("syc: %u\n", tmp_sync_width);
 
-            // printf("opt_pulse: %u, interval: %u\n",
-            // t_opt_pulse,loca_duration);
+        ////            printf("opt_pulse: %u, interval: %u\n",
+        ////            t_opt_pulse,loca_duration);
 
-            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
-            // B_Y);
+        //            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X,
+        //            A_Y, B_X,
+        //            // B_Y);
 
-            //  printf("syc: %u, skp: %u, swp: %u\n",
-            //  tmp_count_sync,tmp_count_skip, tmp_count_sweep);
-            tmp_count_skip = 0;
-            tmp_count_sweep = 0;
-            tmp_count_sync = 0;
-        }
+        //            //  printf("syc: %u, skp: %u, swp: %u\n",
+        //            //  tmp_count_sync,tmp_count_skip, tmp_count_sweep);
+        //            tmp_count_skip = 0;
+        //            tmp_count_sweep = 0;
+        //            tmp_count_sync = 0;
+        //        }
+
         //      printf("fall: %u, rise: %u\n",timestamp_fall, timestamp_rise);
         // print to uart after an entire XY.
         //        if ((last_A_X != A_X || last_A_Y != A_Y) ||
