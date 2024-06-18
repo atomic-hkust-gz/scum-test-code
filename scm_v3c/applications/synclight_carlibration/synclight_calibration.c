@@ -81,7 +81,7 @@ void config_lighthouse_mote(void) {
     GPO_enables(0xFFFF);
 
     // Set HCLK source as HF_CLOCK
-    // set_asc_bit(1147);
+    set_asc_bit(1147);
 
     // Set RFTimer source as HF_CLOCK
     set_asc_bit(1151);
@@ -101,14 +101,14 @@ void config_lighthouse_mote(void) {
     set_asc_bit(42);
 
     // div =4
-    set_asc_bit(49);
-    set_asc_bit(48);
-    set_asc_bit(47);
-    set_asc_bit(46);
-    set_asc_bit(45);
-    clear_asc_bit(44);
-    set_asc_bit(43);
-    set_asc_bit(42);
+    // set_asc_bit(49);
+    // set_asc_bit(48);
+    // set_asc_bit(47);
+    // set_asc_bit(46);
+    // set_asc_bit(45);
+    // clear_asc_bit(44);
+    // set_asc_bit(43);
+    // set_asc_bit(42);
 
     // is RF timer in 500k when this value is 40?
     // set_asc_bit(49);
@@ -132,18 +132,18 @@ void config_lighthouse_mote(void) {
 
     // try to use divider on HFCLK
     // Set HCLK divider to 2
-    // clear_asc_bit(57);
-    // clear_asc_bit(56);
-    // clear_asc_bit(55);
-    // clear_asc_bit(54);
-    // clear_asc_bit(53);
-    // set_asc_bit(52);  // inverted
-    // set_asc_bit(51);
-    // clear_asc_bit(50);
+    clear_asc_bit(57);
+    clear_asc_bit(56);
+    clear_asc_bit(55);
+    clear_asc_bit(54);
+    clear_asc_bit(53);
+    set_asc_bit(52);  // inverted
+    set_asc_bit(51);
+    clear_asc_bit(50);
 
     // Set RF Timer divider to pass through so that RF Timer is 20 MHz,
     //  passthrough means ignore the divider.
-    set_asc_bit(36);
+    // set_asc_bit(36);
 
     //    how about 1M?(20,0001 0100->1110 1011)
     //    set_asc_bit(49);
