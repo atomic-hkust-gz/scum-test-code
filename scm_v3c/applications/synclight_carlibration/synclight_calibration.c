@@ -180,26 +180,26 @@ void distinguish_xy(uint32_t light_duration) {
     // if (light_duration < 585 + WIDTH_BIAS && light_duration > 100 +
     // WIDTH_BIAS)
     //     loca_x = LASER;  // Laser sweep (THIS NEEDS TUNING)
-    if (light_duration < 410 + WIDTH_BIAS && light_duration > 340 + WIDTH_BIAS)
+    if (light_duration < 675 + WIDTH_BIAS && light_duration > 500 + WIDTH_BIAS)
         loca_x = 1;  // Azimuth sync, data=0, skip = 0
-    if (light_duration >= 410 + WIDTH_BIAS && light_duration < 480 + WIDTH_BIAS)
+    else if (light_duration >= 675 + WIDTH_BIAS && light_duration < 781 + WIDTH_BIAS)
         loca_x = 0;  // Elevation sync, data=0, skip = 0
-    if (light_duration >= 480 + WIDTH_BIAS && light_duration < 550 + WIDTH_BIAS)
+    else if (light_duration >= 781 + WIDTH_BIAS && light_duration < 885 + WIDTH_BIAS)
         loca_x = 1;  // Azimuth sync, data=1, skip = 0
-    if (light_duration >= 550 + WIDTH_BIAS && light_duration < 989 + WIDTH_BIAS)
+    else if (light_duration >= 885 + WIDTH_BIAS && light_duration < 989 + WIDTH_BIAS)
         loca_x = 0;  // Elevation sync, data=1, skip = 0
-    // if (light_duration >= 989 + WIDTH_BIAS && light_duration < 1083 +
-    // WIDTH_BIAS)
-    //     pulse_type = AZ_SKIP;  // Azimuth sync, data=0, skip = 1
-    // if (light_duration >= 1083 + WIDTH_BIAS && light_duration < 1200 +
-    // WIDTH_BIAS)
-    //     pulse_type = EL_SKIP;  // elevation sync, data=0, skip = 1
-    // if (light_duration >= 1200 + WIDTH_BIAS && light_duration < 1300 +
-    // WIDTH_BIAS)
-    //     pulse_type = AZ_SKIP;  // Azimuth sync, data=1, skip = 1
-    // if (light_duration >= 1300 + WIDTH_BIAS && light_duration < 1400 +
-    // WIDTH_BIAS)
-    //     pulse_type = EL_SKIP;  // Elevation sync, data=1, skip = 1
+    else if (light_duration >= 989 + WIDTH_BIAS && light_duration < 1083 +
+    WIDTH_BIAS)
+        loca_x = 1;  // Azimuth sync, data=0, skip = 1
+    else if (light_duration >= 1083 + WIDTH_BIAS && light_duration < 1200 +
+    WIDTH_BIAS)
+        loca_x = 0;  // elevation sync, data=0, skip = 1
+    else if (light_duration >= 1200 + WIDTH_BIAS && light_duration < 1300 +
+    WIDTH_BIAS)
+        loca_x = 1;  // Azimuth sync, data=1, skip = 1
+    else if (light_duration >= 1300 + WIDTH_BIAS && light_duration < 1400 +
+    WIDTH_BIAS)
+        loca_x = 0;  // Elevation sync, data=1, skip = 1
 }
 // some debug vars, canbe deleted later
 // divide timer then multiply it to make codecompatible
@@ -273,7 +273,7 @@ void decode_lighthouse(void) {
                 // Dividing the two signals by 50us: 0.000,050/(1/10M) = 500
                 // = 0x320,99us(990ticks) for skip/sync
                 (t_opt_pulse <
-                 350)  // actual boundary condition maybe a little different
+                 500)  // actual boundary condition maybe a little different
                     ? (flag_light_type = type_sweep)
                     : ((t_opt_pulse < 990)
                            ? (flag_light_type = type_sync)
@@ -392,38 +392,37 @@ int main(void) {
     need_optical = 0;
 
     // disable all interrupts
-    //    ICER = 0xFFFF;
+       ICER = 0xFFFF;
 
     //  test rftimer
-    ISER = 0x0080;
+    // ISER = 0x0080;
 
     printf("~~~~start to say HELLO?~~~~~%d\n", app_vars.count);
 
-    delay_milliseconds_asynchronous(1000, 7);
+    // delay_milliseconds_asynchronous(1000, 7);
     //  here is the timecounter to control print velocity
     i = 0;
     while (1) {
-        //        decode_lighthouse();
+               decode_lighthouse();
         //      wait some time then print to uart
-        //        i++;
+               i++;
         //
-        //        if (i == 100000) {
-        //            i = 0;
-        //            // printf("syc: %u\n", tmp_sync_width);
+               if (i == 100000) {
+                   i = 0;
+                   printf("syc: %u\n", tmp_sync_width);
 
-        ////            printf("opt_pulse: %u, interval: %u\n",
-        ////            t_opt_pulse,loca_duration);
+        //            printf("opt_pulse: %u, interval: %u\n",
+        //            t_opt_pulse,loca_duration);
 
-        //            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X,
-        //            A_Y, B_X,
-        //            // B_Y);
+                   printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X,
+                   A_Y, B_X, B_Y);
 
-        //            //  printf("syc: %u, skp: %u, swp: %u\n",
-        //            //  tmp_count_sync,tmp_count_skip, tmp_count_sweep);
-        //            tmp_count_skip = 0;
-        //            tmp_count_sweep = 0;
-        //            tmp_count_sync = 0;
-        //        }
+                   //  printf("syc: %u, skp: %u, swp: %u\n",
+                   //  tmp_count_sync,tmp_count_skip, tmp_count_sweep);
+                   tmp_count_skip = 0;
+                   tmp_count_sweep = 0;
+                   tmp_count_sync = 0;
+               }
 
         //      printf("fall: %u, rise: %u\n",timestamp_fall, timestamp_rise);
         // print to uart after an entire XY.
