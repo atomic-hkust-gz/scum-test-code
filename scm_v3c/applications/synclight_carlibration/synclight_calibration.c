@@ -59,11 +59,6 @@ uint32_t A_X = 0;
 uint32_t A_Y = 0;
 uint32_t B_X = 0;
 uint32_t B_Y = 0;
-// save last location message
-uint32_t last_A_X = 0;
-uint32_t last_A_Y = 0;
-uint32_t last_B_X = 0;
-uint32_t last_B_Y = 0;
 //=========================== prototypes ======================================
 void config_lighthouse_mote(void) {
     //  I think RF timer needs to be reset before use, but not essential.
@@ -91,6 +86,8 @@ void config_lighthouse_mote(void) {
 
     // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
     // 10MHz (inverted, so 0000 0010-->1111 1101)
+    // infact, the max freq is 10M, 20M need to raise the supply voltage for
+    // VDDD. once change HCLK, UART baudrate will change too.
     set_asc_bit(49);
     set_asc_bit(48);
     set_asc_bit(47);
@@ -100,38 +97,12 @@ void config_lighthouse_mote(void) {
     clear_asc_bit(43);
     set_asc_bit(42);
 
-    // div =4
-    // set_asc_bit(49);
-    // set_asc_bit(48);
-    // set_asc_bit(47);
-    // set_asc_bit(46);
-    // set_asc_bit(45);
-    // clear_asc_bit(44);
-    // set_asc_bit(43);
-    // set_asc_bit(42);
-
-    // is RF timer in 500k when this value is 40?
-    // set_asc_bit(49);
-    // set_asc_bit(48);
-    // clear_asc_bit(47);
-    // set_asc_bit(46);
-    // clear_asc_bit(45);
-    // set_asc_bit(44);
-    // set_asc_bit(43);
-    // set_asc_bit(42);
-
-    // this is 2M,div = 10
-    // set_asc_bit(49);
-    // set_asc_bit(48);
-    // set_asc_bit(47);
-    // set_asc_bit(46);
-    // clear_asc_bit(45);
-    // set_asc_bit(44);
-    // clear_asc_bit(43);
-    // set_asc_bit(42);
-
     // try to use divider on HFCLK
-    // Set HCLK divider to 2
+    // Set HCLK divider to 2(0000 0010->0000 0110,only third low bit need
+    // invert) infact, the max freq is 10M, 20M need to raise the supply voltage
+    // for VDDD. HCLK is for cortex core, if you do not set it to 10M, it stay
+    // at 5M by default. if HCLK is 5M, RFtimer can not faster than 5M. I do not
+    // know the reason.
     clear_asc_bit(57);
     clear_asc_bit(56);
     clear_asc_bit(55);
@@ -141,33 +112,10 @@ void config_lighthouse_mote(void) {
     set_asc_bit(51);
     clear_asc_bit(50);
 
-    // Set RF Timer divider to pass through so that RF Timer is 20 MHz,
+    // Set RF Timer divider to pass through so that RF Timer is 20 MHz,(not
+    // faster than 5M if didnt set HCLK)
     //  passthrough means ignore the divider.
     // set_asc_bit(36);
-
-    //    how about 1M?(20,0001 0100->1110 1011)
-    //    set_asc_bit(49);
-    //    set_asc_bit(48);
-    //    set_asc_bit(47);
-    //    clear_asc_bit(46);
-    //    set_asc_bit(45);
-    //    clear_asc_bit(44);
-    //    set_asc_bit(43);
-    //    set_asc_bit(42);
-
-    // Set 2M RC as source for chip CLK
-    // set_asc_bit(1156);
-
-    // Enable 32k for cal
-    // set_asc_bit(623);
-
-    // Enable passthrough on chip CLK divider
-    // set_asc_bit(41);
-
-    // Init counter setup - set all to analog_cfg control
-    // scm3c_hw_interface_vars.ASC[0] is leftmost
-    // scm3c_hw_interface_vars.ASC[0] |= 0x6F800000;
-    // for (t = 2; t < 9; t++) set_asc_bit(t);
 
     analog_scan_chain_write();
     analog_scan_chain_load();
@@ -182,23 +130,26 @@ void distinguish_xy(uint32_t light_duration) {
     //     loca_x = LASER;  // Laser sweep (THIS NEEDS TUNING)
     if (light_duration < 675 + WIDTH_BIAS && light_duration > 500 + WIDTH_BIAS)
         loca_x = 1;  // Azimuth sync, data=0, skip = 0
-    else if (light_duration >= 675 + WIDTH_BIAS && light_duration < 781 + WIDTH_BIAS)
+    else if (light_duration >= 675 + WIDTH_BIAS &&
+             light_duration < 781 + WIDTH_BIAS)
         loca_x = 0;  // Elevation sync, data=0, skip = 0
-    else if (light_duration >= 781 + WIDTH_BIAS && light_duration < 885 + WIDTH_BIAS)
+    else if (light_duration >= 781 + WIDTH_BIAS &&
+             light_duration < 885 + WIDTH_BIAS)
         loca_x = 1;  // Azimuth sync, data=1, skip = 0
-    else if (light_duration >= 885 + WIDTH_BIAS && light_duration < 989 + WIDTH_BIAS)
+    else if (light_duration >= 885 + WIDTH_BIAS &&
+             light_duration < 989 + WIDTH_BIAS)
         loca_x = 0;  // Elevation sync, data=1, skip = 0
-    else if (light_duration >= 989 + WIDTH_BIAS && light_duration < 1083 +
-    WIDTH_BIAS)
+    else if (light_duration >= 989 + WIDTH_BIAS &&
+             light_duration < 1083 + WIDTH_BIAS)
         loca_x = 1;  // Azimuth sync, data=0, skip = 1
-    else if (light_duration >= 1083 + WIDTH_BIAS && light_duration < 1200 +
-    WIDTH_BIAS)
+    else if (light_duration >= 1083 + WIDTH_BIAS &&
+             light_duration < 1200 + WIDTH_BIAS)
         loca_x = 0;  // elevation sync, data=0, skip = 1
-    else if (light_duration >= 1200 + WIDTH_BIAS && light_duration < 1300 +
-    WIDTH_BIAS)
+    else if (light_duration >= 1200 + WIDTH_BIAS &&
+             light_duration < 1300 + WIDTH_BIAS)
         loca_x = 1;  // Azimuth sync, data=1, skip = 1
-    else if (light_duration >= 1300 + WIDTH_BIAS && light_duration < 1400 +
-    WIDTH_BIAS)
+    else if (light_duration >= 1300 + WIDTH_BIAS &&
+             light_duration < 1400 + WIDTH_BIAS)
         loca_x = 0;  // Elevation sync, data=1, skip = 1
 }
 // some debug vars, canbe deleted later
@@ -214,16 +165,13 @@ void decode_lighthouse(void) {
     // lighthouse code start
     last_gpio = current_gpio;
     current_gpio = OPTICAL_DATA_RAW_PIN;
-    // Update to next FSM state
-    // state = nextstate;
 
     // Detect rising edge
     if (last_gpio == 0 && current_gpio == 1) {
         // Reset RF Timer count register at rising edge of first sync pulse
-        // if(state == 0) RFTIMER_REG__COUNTER = 0x0;
 
         // Save when this event happened
-        timestamp_rise = RFTIMER_REG__COUNTER * para_temp;
+        timestamp_rise = RFTIMER_REG__COUNTER;
         //      only for debugging
         gpio_10_toggle();
         switch (flag_start) {
@@ -243,7 +191,7 @@ void decode_lighthouse(void) {
     // Detect falling edge
     else if (last_gpio == 1 && current_gpio == 0) {
         // Save when this event happened
-        timestamp_fall = RFTIMER_REG__COUNTER * para_temp;
+        timestamp_fall = RFTIMER_REG__COUNTER;
 
         // Calculate how wide this pulse was
         pulse_width = timestamp_fall - timestamp_rise;
@@ -284,8 +232,6 @@ void decode_lighthouse(void) {
                     // falling edge interrupt will need to calculate
                     // position
                     case type_sync:
-                        tmp_count_sync++;              // debug,remove later
-                        tmp_sync_width = t_opt_pulse;  // debug, remove later
                         // If sync, distance measurement starts from this
                         // time.
                         t_d_start = t_0_start;
@@ -318,8 +264,7 @@ void decode_lighthouse(void) {
                         }
                         break;
                     case type_sweep:
-                        gpio_8_toggle();
-                        tmp_count_sweep++;  // debug,remove later
+                        gpio_8_toggle();  // debug,remove later
                         //  0 ：NULL,1: next is A,2:next is B
                         flag_station = 1;
 
@@ -351,7 +296,6 @@ void decode_lighthouse(void) {
 
                         break;
                     case type_skip_sync:
-                        tmp_count_skip++;  // debug,remove later
                         if (flag_station >= 1) {
                             flag_station++;
                             // Exceeding 2 means that a sweep was not seen,
@@ -368,9 +312,6 @@ void decode_lighthouse(void) {
             default:
                 break;
         }
-        // lighthouse_positioning_protocol_decoding();
-        //        printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
-        //        B_Y);
     }
 }
 //=========================== main ============================================
@@ -392,53 +333,30 @@ int main(void) {
     need_optical = 0;
 
     // disable all interrupts
-       ICER = 0xFFFF;
+    ICER = 0xFFFF;
 
     //  test rftimer
     // ISER = 0x0080;
 
     printf("~~~~start to say HELLO?~~~~~%d\n", app_vars.count);
 
-    // delay_milliseconds_asynchronous(1000, 7);
+    // delay_milliseconds_asynchronous(1000, 7);//test RFtimer freq,if rftimer
+    // is 500KHz, interrupt per 1s(1000ms)
     //  here is the timecounter to control print velocity
     i = 0;
     while (1) {
-               decode_lighthouse();
+        decode_lighthouse();
         //      wait some time then print to uart
-               i++;
-        //
-               if (i == 100000) {
-                   i = 0;
-                   printf("syc: %u\n", tmp_sync_width);
+        i++;
+        if (i == 100000) {
+            i = 0;
+            printf("syc: %u\n", tmp_sync_width);
 
-        //            printf("opt_pulse: %u, interval: %u\n",
-        //            t_opt_pulse,loca_duration);
+            //            printf("opt_pulse: %u, interval: %u\n",
+            //            t_opt_pulse,loca_duration);
 
-                   printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X,
-                   A_Y, B_X, B_Y);
-
-                   //  printf("syc: %u, skp: %u, swp: %u\n",
-                   //  tmp_count_sync,tmp_count_skip, tmp_count_sweep);
-                   tmp_count_skip = 0;
-                   tmp_count_sweep = 0;
-                   tmp_count_sync = 0;
-               }
-
-        //      printf("fall: %u, rise: %u\n",timestamp_fall, timestamp_rise);
-        // print to uart after an entire XY.
-        //        if ((last_A_X != A_X || last_A_Y != A_Y) ||
-        //            (last_B_X != B_X && last_B_Y != B_Y)) {
-        //            last_A_X = A_X;
-        //            last_A_Y = A_Y;
-        //            last_B_X = B_X;
-        //            last_B_Y = B_Y;
-        //            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y,
-        //            B_X, B_Y);
-        //        }
-        //      printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
-        //      B_Y);
-
-        // printf("current gpio: %d\n", current_gpio);
+            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
+        }
 
         //        printf("Hello World! %d\n", app_vars.count);
         //        app_vars.count += 1;
