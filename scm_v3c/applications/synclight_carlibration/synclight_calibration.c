@@ -59,6 +59,12 @@ uint32_t A_X = 0;
 uint32_t A_Y = 0;
 uint32_t B_X = 0;
 uint32_t B_Y = 0;
+
+// Read HF_CLK counter,from optical_sfd_isr() at optical.c
+#define HF_CLK_RDATA_LSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000)
+#define HF_CLK_RDATA_MSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000)
+#define HF_CLK_COUNT (HF_CLK_RDATA_LSB + (HF_CLK_RDATA_MSB << 16))
+
 //=========================== prototypes ======================================
 void config_lighthouse_mote(void) {
     //  I think RF timer needs to be reset before use, but not essential.
@@ -318,6 +324,7 @@ void decode_lighthouse(void) {
 
 int main(void) {
     uint32_t i;
+  uint32_t hf_rdata_lsb, hf_rdata_msb,hf_count_HFclock;//test HF_CLK
 
     memset(&app_vars, 0, sizeof(app_vars_t));
 
@@ -337,6 +344,12 @@ int main(void) {
 
     //  test rftimer
     // ISER = 0x0080;
+  
+    //test HF_CLK
+  // Read HF_CLOCK counter  
+    hf_rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
+    hf_rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
+    hf_count_HFclock = hf_rdata_lsb + (hf_rdata_msb << 16);
 
     printf("~~~~start to say HELLO?~~~~~%d\n", app_vars.count);
 
@@ -350,12 +363,14 @@ int main(void) {
         i++;
         if (i == 100000) {
             i = 0;
-            printf("syc: %u\n", tmp_sync_width);
+            // printf("syc: %u\n", tmp_sync_width);
 
             //            printf("opt_pulse: %u, interval: %u\n",
             //            t_opt_pulse,loca_duration);
 
-            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
+            printf("hfclk: %u\n", hf_count_HFclock);
+
+            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
         }
 
         //        printf("Hello World! %d\n", app_vars.count);

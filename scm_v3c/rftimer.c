@@ -195,7 +195,7 @@ void rftimer_isr(void) {
 #ifdef ENABLE_PRINTF
             printf("COMPARE%d MATCH\r\n", i);
 #endif
-  gpio_10_toggle();
+  gpio_10_toggle();//for freq test
             handle_interrupt(i);
         }
 
