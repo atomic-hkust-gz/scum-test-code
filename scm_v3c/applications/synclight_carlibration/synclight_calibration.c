@@ -324,7 +324,7 @@ void decode_lighthouse(void) {
 
 int main(void) {
     uint32_t i;
-  uint32_t hf_rdata_lsb, hf_rdata_msb,hf_count_HFclock;//test HF_CLK
+    uint32_t hf_rdata_lsb, hf_rdata_msb, hf_count_HFclock;  // test HF_CLK
 
     memset(&app_vars, 0, sizeof(app_vars_t));
 
@@ -344,9 +344,9 @@ int main(void) {
 
     //  test rftimer
     // ISER = 0x0080;
-  
-    //test HF_CLK
-  // Read HF_CLOCK counter  
+
+    // test HF_CLK
+    // Read HF_CLOCK counter
     hf_rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
     hf_rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
     hf_count_HFclock = hf_rdata_lsb + (hf_rdata_msb << 16);
@@ -370,7 +370,8 @@ int main(void) {
 
             printf("hfclk: %u\n", hf_count_HFclock);
 
-            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
+            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
+            // B_Y);
         }
 
         //        printf("Hello World! %d\n", app_vars.count);
