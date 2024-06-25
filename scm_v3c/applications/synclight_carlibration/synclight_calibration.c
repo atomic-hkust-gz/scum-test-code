@@ -368,10 +368,9 @@ int main(void) {
             //            printf("opt_pulse: %u, interval: %u\n",
             //            t_opt_pulse,loca_duration);
 
-            printf("hfclk: %u\n", hf_count_HFclock);
+            // printf("hfclk: %u\n", hf_count_HFclock);
 
-            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
-            // B_Y);
+            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
         }
 
         //        printf("Hello World! %d\n", app_vars.count);
