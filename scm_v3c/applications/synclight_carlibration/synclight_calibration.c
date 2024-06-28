@@ -361,7 +361,7 @@ int main(void) {
         decode_lighthouse();
         //      wait some time then print to uart
         i++;
-        if (i == 100000) {
+        if (i == 5000) {
             i = 0;
             // printf("syc: %u\n", tmp_sync_width);
 
