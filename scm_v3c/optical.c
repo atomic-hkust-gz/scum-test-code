@@ -94,7 +94,7 @@ void optical_32_isr(void) {
 // 231, 47} This interrupt can also be used to synchronize to the start of an
 // optical data transfer Need to make sure a new bit has been clocked in prior
 // to returning from this ISR, or else it will immediately execute again
-void optical_sfd_isr(void) {
+  void optical_sfd_isr(void) {
   switch(need_optical)
 {
     case 1:
