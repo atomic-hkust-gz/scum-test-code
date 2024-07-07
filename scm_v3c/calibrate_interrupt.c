@@ -6,6 +6,7 @@
 #include "memory_map.h"
 #include "optical.h"
 #include "scm3c_hw_interface.h"
+#include "scum_defs.h"
 
 //=========================== defines =========================================
 
@@ -46,6 +47,16 @@ void gpio_ext_9_interrupt_disable(void) { ICER |= 0x2000; }
 void gpio_ext_10_interrupt_enable(void) { ISER |= 0x4000; }
 
 void gpio_ext_10_interrupt_disable(void) { ICER |= 0x4000; }
+
+void sync_light_calibrate_init(void) {
+    memset(&synclight_cal_vars, 0, sizeof(synclight_calibrate_vars_t));
+
+    // Target radio LO freq = 2.4025G
+    // Divide ratio is currently 480*2
+    // Calibration counts for 100ms
+    synclight_cal_vars.LC_target = REFERENCE_LC_TARGET;
+    synclight_cal_vars.LC_code = DEFUALT_INIT_LC_CODE;
+}
 
 void sync_light_calibrate_isr(void) {
     //	gpio_10_toggle();

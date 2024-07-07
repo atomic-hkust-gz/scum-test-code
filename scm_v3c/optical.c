@@ -1,6 +1,7 @@
-#include <stdio.h>
-#include <string.h> 
 #include <gpio.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "memory_map.h"
 #include "radio.h"
 #include "scm3c_hw_interface.h"
@@ -60,8 +61,7 @@ void perform_calibration(void) {
     optical_enable();
 
     // Wait for optical cal to finish
-    while (optical_getCalibrationFinshed() == 0)
-        ;
+    while (optical_getCalibrationFinshed() == 0);
 
     // Disable the radio now that it is calibrated
     radio_rfOff();
@@ -94,212 +94,208 @@ void optical_32_isr(void) {
 // 231, 47} This interrupt can also be used to synchronize to the start of an
 // optical data transfer Need to make sure a new bit has been clocked in prior
 // to returning from this ISR, or else it will immediately execute again
-  void optical_sfd_isr(void) {
-  switch(need_optical)
-{
-    case 1:
-    {
-    // 1.1V/VDDD tap fix
-    // helps reorder assembly code
-    // Not completely sure why this works
-    uint32_t dummy = 0;
+void optical_sfd_isr(void) {
+    switch (need_optical) {
+        case 1: {
+            // 1.1V/VDDD tap fix
+            // helps reorder assembly code
+            // Not completely sure why this works
+            uint32_t dummy = 0;
 
-    int32_t t;
-    uint32_t rdata_lsb, rdata_msb;
-    uint32_t count_LC, count_32k, count_2M, count_HFclock, count_IF;
+            int32_t t;
+            uint32_t rdata_lsb, rdata_msb;
+            uint32_t count_LC, count_32k, count_2M, count_HFclock, count_IF;
 
-    uint32_t HF_CLOCK_fine;
-    uint32_t HF_CLOCK_coarse;
-    uint32_t RC2M_coarse;
-    uint32_t RC2M_fine;
-    uint32_t RC2M_superfine;
-    uint32_t IF_clk_target;
-    uint32_t IF_coarse;
-    uint32_t IF_fine;
+            uint32_t HF_CLOCK_fine;
+            uint32_t HF_CLOCK_coarse;
+            uint32_t RC2M_coarse;
+            uint32_t RC2M_fine;
+            uint32_t RC2M_superfine;
+            uint32_t IF_clk_target;
+            uint32_t IF_coarse;
+            uint32_t IF_fine;
 
-    HF_CLOCK_fine = scm3c_hw_interface_get_HF_CLOCK_fine();
-    HF_CLOCK_coarse = scm3c_hw_interface_get_HF_CLOCK_coarse();
-    RC2M_coarse = scm3c_hw_interface_get_RC2M_coarse();
-    RC2M_fine = scm3c_hw_interface_get_RC2M_fine();
-    RC2M_superfine = scm3c_hw_interface_get_RC2M_superfine();
-    IF_clk_target = scm3c_hw_interface_get_IF_clk_target();
-    IF_coarse = scm3c_hw_interface_get_IF_coarse();
-    IF_fine = scm3c_hw_interface_get_IF_fine();
+            HF_CLOCK_fine = scm3c_hw_interface_get_HF_CLOCK_fine();
+            HF_CLOCK_coarse = scm3c_hw_interface_get_HF_CLOCK_coarse();
+            RC2M_coarse = scm3c_hw_interface_get_RC2M_coarse();
+            RC2M_fine = scm3c_hw_interface_get_RC2M_fine();
+            RC2M_superfine = scm3c_hw_interface_get_RC2M_superfine();
+            IF_clk_target = scm3c_hw_interface_get_IF_clk_target();
+            IF_coarse = scm3c_hw_interface_get_IF_coarse();
+            IF_fine = scm3c_hw_interface_get_IF_fine();
 
-    // Disable all counters
-    ANALOG_CFG_REG__0 = 0x007F;
+            // Disable all counters
+            ANALOG_CFG_REG__0 = 0x007F;
 
-    // Keep track of how many calibration iterations have been completed
-    optical_vars.optical_cal_iteration++;
+            // Keep track of how many calibration iterations have been completed
+            optical_vars.optical_cal_iteration++;
 
-    // Read 32k counter
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
-    count_32k = rdata_lsb + (rdata_msb << 16);
+            // Read 32k counter
+            rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
+            rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
+            count_32k = rdata_lsb + (rdata_msb << 16);
 
-    // Read HF_CLOCK counter
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
-    count_HFclock = rdata_lsb + (rdata_msb << 16);
+            // Read HF_CLOCK counter
+            rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
+            rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
+            count_HFclock = rdata_lsb + (rdata_msb << 16);
 
-    // Read 2M counter
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
-    count_2M = rdata_lsb + (rdata_msb << 16);
+            // Read 2M counter
+            rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
+            rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
+            count_2M = rdata_lsb + (rdata_msb << 16);
 
-    // Read LC_div counter (via counter4)
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
-    count_LC = rdata_lsb + (rdata_msb << 16);
+            // Read LC_div counter (via counter4)
+            rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
+            rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
+            count_LC = rdata_lsb + (rdata_msb << 16);
 
-    // Read IF ADC_CLK counter
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x300000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x340000);
-    count_IF = rdata_lsb + (rdata_msb << 16);
+            // Read IF ADC_CLK counter
+            rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x300000);
+            rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x340000);
+            count_IF = rdata_lsb + (rdata_msb << 16);
 
-    // Reset all counters
-    ANALOG_CFG_REG__0 = 0x0000;
+            // Reset all counters
+            ANALOG_CFG_REG__0 = 0x0000;
 
-    // Enable all counters
-    ANALOG_CFG_REG__0 = 0x3FFF;
+            // Enable all counters
+            ANALOG_CFG_REG__0 = 0x3FFF;
 
-    // Don't make updates on the first two executions of this ISR
-    if (optical_vars.optical_cal_iteration > 2) {
-        // Do correction on HF CLOCK
-        // Fine DAC step size is about 6000 counts
-        if (count_HFclock < 1997000) {  // 1997000 original value
-            if (HF_CLOCK_fine == 0) {
-                HF_CLOCK_coarse--;
-                HF_CLOCK_fine = 10;
-                optical_vars.optical_cal_iteration = 3;
-            } else {
-                HF_CLOCK_fine--;
-            }
-        }
-        if (count_HFclock >
-            2003000) {  // new value I picked was 2010000, originally 2003000
-            if (HF_CLOCK_fine == 31) {
-                HF_CLOCK_coarse++;
-                HF_CLOCK_fine = 20;
-                optical_vars.optical_cal_iteration = 3;
-            } else {
-                HF_CLOCK_fine++;
-            }
-        }
-
-        set_sys_clk_secondary_freq(HF_CLOCK_coarse, HF_CLOCK_fine);
-        scm3c_hw_interface_set_HF_CLOCK_coarse(HF_CLOCK_coarse);
-        scm3c_hw_interface_set_HF_CLOCK_fine(HF_CLOCK_fine);
-
-        // Do correction on LC
-        if (count_LC > (optical_vars.LC_target + 0)) {
-            optical_vars.LC_code -= 1;
-        }
-        if (count_LC < (optical_vars.LC_target - 0)) {
-            optical_vars.LC_code += 1;
-        }
-        LC_monotonic(optical_vars.LC_code);
-
-        // Do correction on 2M RC
-        // Coarse step ~1100 counts, fine ~150 counts, superfine ~25
-        // Too fast
-        if (count_2M > (200600)) {
-            RC2M_coarse += 1;
-        } else {
-            if (count_2M > (200080)) {
-                RC2M_fine += 1;
-            } else {
-                if (count_2M > (200015)) {
-                    RC2M_superfine += 1;
+            // Don't make updates on the first two executions of this ISR
+            if (optical_vars.optical_cal_iteration > 2) {
+                // Do correction on HF CLOCK
+                // Fine DAC step size is about 6000 counts
+                if (count_HFclock < 1997000) {  // 1997000 original value
+                    if (HF_CLOCK_fine == 0) {
+                        HF_CLOCK_coarse--;
+                        HF_CLOCK_fine = 10;
+                        optical_vars.optical_cal_iteration = 3;
+                    } else {
+                        HF_CLOCK_fine--;
+                    }
                 }
-            }
-        }
-
-        // Too slow
-        if (count_2M < (199400)) {
-            RC2M_coarse -= 1;
-        } else {
-            if (count_2M < (199920)) {
-                RC2M_fine -= 1;
-            } else {
-                if (count_2M < (199985)) {
-                    RC2M_superfine -= 1;
+                if (count_HFclock > 2003000) {  // new value I picked was
+                                                // 2010000, originally 2003000
+                    if (HF_CLOCK_fine == 31) {
+                        HF_CLOCK_coarse++;
+                        HF_CLOCK_fine = 20;
+                        optical_vars.optical_cal_iteration = 3;
+                    } else {
+                        HF_CLOCK_fine++;
+                    }
                 }
+
+                set_sys_clk_secondary_freq(HF_CLOCK_coarse, HF_CLOCK_fine);
+                scm3c_hw_interface_set_HF_CLOCK_coarse(HF_CLOCK_coarse);
+                scm3c_hw_interface_set_HF_CLOCK_fine(HF_CLOCK_fine);
+
+                // Do correction on LC
+                if (count_LC > (optical_vars.LC_target + 0)) {
+                    optical_vars.LC_code -= 1;
+                }
+                if (count_LC < (optical_vars.LC_target - 0)) {
+                    optical_vars.LC_code += 1;
+                }
+                LC_monotonic(optical_vars.LC_code);
+
+                // Do correction on 2M RC
+                // Coarse step ~1100 counts, fine ~150 counts, superfine ~25
+                // Too fast
+                if (count_2M > (200600)) {
+                    RC2M_coarse += 1;
+                } else {
+                    if (count_2M > (200080)) {
+                        RC2M_fine += 1;
+                    } else {
+                        if (count_2M > (200015)) {
+                            RC2M_superfine += 1;
+                        }
+                    }
+                }
+
+                // Too slow
+                if (count_2M < (199400)) {
+                    RC2M_coarse -= 1;
+                } else {
+                    if (count_2M < (199920)) {
+                        RC2M_fine -= 1;
+                    } else {
+                        if (count_2M < (199985)) {
+                            RC2M_superfine -= 1;
+                        }
+                    }
+                }
+
+                set_2M_RC_frequency(31, 31, RC2M_coarse, RC2M_fine,
+                                    RC2M_superfine);
+                scm3c_hw_interface_set_RC2M_coarse(RC2M_coarse);
+                scm3c_hw_interface_set_RC2M_fine(RC2M_fine);
+                scm3c_hw_interface_set_RC2M_superfine(RC2M_superfine);
+
+                // Do correction on IF RC clock
+                // Fine DAC step size is ~2800 counts
+                if (count_IF > (1600000 + 1400)) {
+                    IF_fine += 1;
+                }
+                if (count_IF < (1600000 - 1400)) {
+                    IF_fine -= 1;
+                }
+
+                set_IF_clock_frequency(IF_coarse, IF_fine, 0);
+                scm3c_hw_interface_set_IF_coarse(IF_coarse);
+                scm3c_hw_interface_set_IF_fine(IF_fine);
+
+                analog_scan_chain_write();
+                analog_scan_chain_load();
             }
-        }
 
-        set_2M_RC_frequency(31, 31, RC2M_coarse, RC2M_fine, RC2M_superfine);
-        scm3c_hw_interface_set_RC2M_coarse(RC2M_coarse);
-        scm3c_hw_interface_set_RC2M_fine(RC2M_fine);
-        scm3c_hw_interface_set_RC2M_superfine(RC2M_superfine);
+            // Debugging output
+            // 1.1V/VDDD tap fix
+            // The print is now broken down into 3 statements instead of one big
+            // print statement
+            // doing this prevent a long string of loads back to back
+            printf("HF=%d-%d   2M=%d-%d", count_HFclock, HF_CLOCK_fine,
+                   count_2M, RC2M_coarse);
+            printf(",%d,%d   LC=%d-%d   ", RC2M_fine, RC2M_superfine, count_LC,
+                   optical_vars.LC_code);
+            printf("IF=%d-%d\r\n", count_IF, IF_fine);
 
-        // Do correction on IF RC clock
-        // Fine DAC step size is ~2800 counts
-        if (count_IF > (1600000 + 1400)) {
-            IF_fine += 1;
-        }
-        if (count_IF < (1600000 - 1400)) {
-            IF_fine -= 1;
-        }
+            if (optical_vars.optical_cal_iteration == 25) {
+                // Disable this ISR
+                ICER = 0x1800;
+                optical_vars.optical_cal_iteration = 0;
+                optical_vars.optical_cal_finished = 1;
 
-        set_IF_clock_frequency(IF_coarse, IF_fine, 0);
-        scm3c_hw_interface_set_IF_coarse(IF_coarse);
-        scm3c_hw_interface_set_IF_fine(IF_fine);
+                // Store the last count values
+                optical_vars.num_32k_ticks_in_100ms = count_32k;
+                optical_vars.num_2MRC_ticks_in_100ms = count_2M;
+                optical_vars.num_IFclk_ticks_in_100ms = count_IF;
+                optical_vars.num_LC_ch11_ticks_in_100ms = count_LC;
+                optical_vars.num_HFclock_ticks_in_100ms = count_HFclock;
 
-        analog_scan_chain_write();
-        analog_scan_chain_load();
+                // Debug prints
+                // printf("LC_code=%d\r\n", optical_vars.LC_code);
+                // printf("IF_fine=%d\r\n", IF_fine);
+
+                // This was an earlier attempt to build out a complete table of
+                // LC_code for TX/RX on each channel It doesn't really work well
+                // yet so leave it commented printf("Building channel
+                // table...");
+
+                // radio_build_channel_table(LC_code);
+
+                // printf("done\r\n");
+
+                // radio_disable_all();
+
+                // Halt all counters
+                ANALOG_CFG_REG__0 = 0x0000;
+            }
+        } break;
+        case 0: {
+            printf("light_detected!\r\n");
+        } break;
+        default:
+            break;
     }
-
-    // Debugging output
-    // 1.1V/VDDD tap fix
-    // The print is now broken down into 3 statements instead of one big
-    // print statement
-    // doing this prevent a long string of loads back to back
-    printf("HF=%d-%d   2M=%d-%d", count_HFclock, HF_CLOCK_fine, count_2M,
-           RC2M_coarse);
-    printf(",%d,%d   LC=%d-%d   ", RC2M_fine, RC2M_superfine, count_LC,
-           optical_vars.LC_code);
-    printf("IF=%d-%d\r\n", count_IF, IF_fine);
-
-    if (optical_vars.optical_cal_iteration == 25) {
-        // Disable this ISR
-        ICER = 0x1800;
-        optical_vars.optical_cal_iteration = 0;
-        optical_vars.optical_cal_finished = 1;
-
-        // Store the last count values
-        optical_vars.num_32k_ticks_in_100ms = count_32k;
-        optical_vars.num_2MRC_ticks_in_100ms = count_2M;
-        optical_vars.num_IFclk_ticks_in_100ms = count_IF;
-        optical_vars.num_LC_ch11_ticks_in_100ms = count_LC;
-        optical_vars.num_HFclock_ticks_in_100ms = count_HFclock;
-
-        // Debug prints
-        // printf("LC_code=%d\r\n", optical_vars.LC_code);
-        // printf("IF_fine=%d\r\n", IF_fine);
-
-        // This was an earlier attempt to build out a complete table of LC_code
-        // for TX/RX on each channel It doesn't really work well yet so leave it
-        // commented
-        // printf("Building channel table...");
-
-        // radio_build_channel_table(LC_code);
-
-        // printf("done\r\n");
-
-        // radio_disable_all();
-
-        // Halt all counters
-        ANALOG_CFG_REG__0 = 0x0000;
-    }
-  }
-    break;
-    case 0:
-      {
-    printf("light_detected!\r\n");
-    }
-      break;
-    default:
-      break;
-  }
 }

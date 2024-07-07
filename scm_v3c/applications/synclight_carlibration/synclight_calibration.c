@@ -5,8 +5,10 @@
 #include "lighthouse_position.h"
 #include "memory_map.h"
 #include "optical.h"
+#include "radio.h"
 #include "rftimer.h"
 #include "scm3c_hw_interface.h"
+#include "scum_defs.h"
 
 //=========================== defines =========================================
 
@@ -22,6 +24,16 @@
 #define type_sync 0
 #define type_sweep 1
 #define type_skip_sync 2
+
+// initialized value for frequency configuration(from scm3c_hw_interface.c)
+#define INIT_HF_CLOCK_FINE 17
+#define INIT_HF_CLOCK_COARSE 3
+#define INIT_RC2M_COARSE 21
+#define INIT_RC2M_FINE 15
+#define INIT_RC2M_SUPERFINE 15
+#define INIT_IF_CLK_TARGET 1600000
+#define INIT_IF_COARSE 22
+#define INIT_IF_FINE 18
 
 //=========================== variables ===========================
 
@@ -67,11 +79,21 @@ uint32_t B_Y = 0;
 
 //=========================== prototypes ======================================
 void config_lighthouse_mote(void) {
+    scm3c_hw_interface_init();
+    optical_init();
+    radio_init();
+    rftimer_init();
+    // a copy of optical_init
+    sync_light_calibrate_init();
+
     //  I think RF timer needs to be reset before use, but not essential.
     // RF Timer rolls over at this value and starts a new cycle
     RFTIMER_REG__MAX_COUNT = 0xFFFFFFFF;
     // Enable RF Timer
     RFTIMER_REG__CONTROL = 0x7;
+
+    // Init LDO control
+    init_ldo_control();
 
     // Select banks for GPIO inputs
     GPI_control(0, 0, 0, 0);
@@ -83,6 +105,11 @@ void config_lighthouse_mote(void) {
 
     // Set HCLK source as HF_CLOCK
     set_asc_bit(1147);
+
+    // Set initial coarse/fine on HF_CLOCK
+    // coarse 0:4 = 860 861 875b 876b 877b
+    // fine 0:4 870 871 872 873 874b
+    set_sys_clk_secondary_freq(INIT_HF_CLOCK_COARSE, INIT_HF_CLOCK_FINE);
 
     // Set RFTimer source as HF_CLOCK
     set_asc_bit(1151);
@@ -122,6 +149,43 @@ void config_lighthouse_mote(void) {
     // faster than 5M if didnt set HCLK)
     //  passthrough means ignore the divider.
     // set_asc_bit(36);
+
+    // need LC, IF, 2M to calibrate.
+    // Set 2M RC as source for chip CLK
+    set_asc_bit(1156);
+
+    // Enable 32k for cal
+    set_asc_bit(623);
+
+    // Enable passthrough on chip CLK divider
+    set_asc_bit(41);
+
+    // Init counter setup - set all to analog_cfg control
+    // scm3c_hw_interface_vars.ASC[0] is leftmost
+    // scm3c_hw_interface_vars.ASC[0] |= 0x6F800000;
+    for (t = 2; t < 9; t++) set_asc_bit(t);
+
+    // Init RX
+    radio_init_rx_MF();
+
+    // Init TX
+    radio_init_tx();
+
+    // Set initial IF ADC clock frequency
+    set_IF_clock_frequency(INIT_IF_COARSE, INIT_IF_FINE, 0);  // cr
+
+    // Set initial TX clock frequency
+    set_2M_RC_frequency(31, 31, INIT_RC2M_COARSE, INIT_RC2M_FINE,
+                        INIT_RC2M_SUPERFINE);  // cr
+
+    // Turn on RC 2M for cal
+    set_asc_bit(1114);  // cr
+
+    // Set initial LO frequency
+    LC_monotonic(DEFUALT_INIT_LC_CODE);
+
+    // Init divider settings
+    radio_init_divider(2000);
 
     analog_scan_chain_write();
     analog_scan_chain_load();
@@ -363,6 +427,7 @@ int main(void) {
         i++;
         if (i == 10000) {
             i = 0;
+            sync_light_calibrate_isr();
             // printf("syc: %u\n", tmp_sync_width);
 
             //            printf("opt_pulse: %u, interval: %u\n",
@@ -370,7 +435,8 @@ int main(void) {
 
             // printf("hfclk: %u\n", hf_count_HFclock);
 
-            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
+            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
+            // B_Y);
         }
 
         //        printf("Hello World! %d\n", app_vars.count);

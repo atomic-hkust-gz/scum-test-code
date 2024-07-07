@@ -1,7 +1,6 @@
 #ifndef __CALIBRATE_INTERRUPT
 #define __CALIBRATE_INTERRUPT
 
-
 #include <string.h>
 
 #include "memory_map.h"
@@ -10,15 +9,11 @@
 
 //=========================== defines =========================================
 
-
 //=========================== variables =======================================
-
 
 //=========================== prototypes ======================================
 
 //=========================== main ============================================
-
-
 
 //=========================== public ==========================================
 
@@ -29,8 +24,9 @@ void gpio_ext_9_interrupt_enable(void);
 void gpio_ext_9_interrupt_disable(void);
 void gpio_ext_10_interrupt_enable(void);
 void gpio_ext_10_interrupt_disable(void);
+void sync_light_calibrate_init(void);
 void sync_light_calibrate_isr(void);
 
 //=========================== private =========================================
 
-#endif 
+#endif
