@@ -399,6 +399,7 @@ int main(void) {
     printf("~~~~my code start~~~~~%d\n", app_vars.count);
 
     config_lighthouse_mote();
+    radio_rxEnable();//openLC,IF?
 
     // clean optical and ex3 interrupt, then re-open ext_3 interrupt
     need_optical = 0;
@@ -425,6 +426,7 @@ int main(void) {
         decode_lighthouse();
         //      wait some time then print to uart
         i++;
+      //i=10,000~=100ms
         if (i == 10000) {
             i = 0;
             sync_light_calibrate_isr();

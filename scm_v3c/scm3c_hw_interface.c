@@ -1191,7 +1191,8 @@ void initialize_mote() {
     set_asc_bit(43);
     set_asc_bit(42);
 
-        // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
+    //can be removed
+    // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
     // 10MHz (inverted, so 0000 0010-->1111 1101)
     // infact, the max freq is 10M, 20M need to raise the supply voltage for
     // VDDD. once change HCLK, UART baudrate will change too.
@@ -1204,6 +1205,7 @@ void initialize_mote() {
     clear_asc_bit(43);
     set_asc_bit(42);
 
+    //can be removed
     // try to use divider on HFCLK
     // Set HCLK divider to 2(0000 0010->0000 0110,only third low bit need
     // invert) infact, the max freq is 10M, 20M need to raise the supply voltage
