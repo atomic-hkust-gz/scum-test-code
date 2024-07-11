@@ -72,12 +72,24 @@ uint32_t A_Y = 0;
 uint32_t B_X = 0;
 uint32_t B_Y = 0;
 
+// store synclight then call synclight calibration
+uint8_t count_sync_light = 0;
+// whether enable the synclight calibration
+uint8_t need_sync_calibration = 0;
+// record 10 synclight duration
+uint32_t servel_synclights_start = 0;
+// uint32_t servel_synclights_end = 0;
+uint32_t servel_synclights_duration = 0;
+// total calibration times
+uint32_t count_calibration = 0;
+
 // Read HF_CLK counter,from optical_sfd_isr() at optical.c
 #define HF_CLK_RDATA_LSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000)
 #define HF_CLK_RDATA_MSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000)
 #define HF_CLK_COUNT (HF_CLK_RDATA_LSB + (HF_CLK_RDATA_MSB << 16))
 
 //=========================== prototypes ======================================
+// gpio pins, RFtimer, HCLK... config for lighthouse localization
 void config_lighthouse_mote(void) {
     scm3c_hw_interface_init();
     optical_init();
@@ -190,6 +202,8 @@ void config_lighthouse_mote(void) {
     analog_scan_chain_write();
     analog_scan_chain_load();
 }
+// after get 10 sync lights, call this function to calibrate clocks
+void perform_synclight_calibration(void) { sync_light_calibrate_isr(); }
 // a method used to replace old xy distinguish method from kilberg code.
 #define WIDTH_BIAS (0 - 0)
 void distinguish_xy(uint32_t light_duration) {
@@ -198,19 +212,24 @@ void distinguish_xy(uint32_t light_duration) {
     // if (light_duration < 585 + WIDTH_BIAS && light_duration > 100 +
     // WIDTH_BIAS)
     //     loca_x = LASER;  // Laser sweep (THIS NEEDS TUNING)
-    if (light_duration < 675 + WIDTH_BIAS && light_duration > 500 + WIDTH_BIAS)
+    if (light_duration < 675 + WIDTH_BIAS &&
+        light_duration > 500 + WIDTH_BIAS) {
         loca_x = 1;  // Azimuth sync, data=0, skip = 0
-    else if (light_duration >= 675 + WIDTH_BIAS &&
-             light_duration < 781 + WIDTH_BIAS)
+        count_sync_light += 1;
+    } else if (light_duration >= 675 + WIDTH_BIAS &&
+               light_duration < 781 + WIDTH_BIAS) {
         loca_x = 0;  // Elevation sync, data=0, skip = 0
-    else if (light_duration >= 781 + WIDTH_BIAS &&
-             light_duration < 885 + WIDTH_BIAS)
+        count_sync_light += 1;
+    } else if (light_duration >= 781 + WIDTH_BIAS &&
+               light_duration < 885 + WIDTH_BIAS) {
         loca_x = 1;  // Azimuth sync, data=1, skip = 0
-    else if (light_duration >= 885 + WIDTH_BIAS &&
-             light_duration < 989 + WIDTH_BIAS)
+        count_sync_light += 1;
+    } else if (light_duration >= 885 + WIDTH_BIAS &&
+               light_duration < 989 + WIDTH_BIAS) {
         loca_x = 0;  // Elevation sync, data=1, skip = 0
-    else if (light_duration >= 989 + WIDTH_BIAS &&
-             light_duration < 1083 + WIDTH_BIAS)
+        count_sync_light += 1;
+    } else if (light_duration >= 989 + WIDTH_BIAS &&
+               light_duration < 1083 + WIDTH_BIAS)
         loca_x = 1;  // Azimuth sync, data=0, skip = 1
     else if (light_duration >= 1083 + WIDTH_BIAS &&
              light_duration < 1200 + WIDTH_BIAS)
@@ -332,9 +351,26 @@ void decode_lighthouse(void) {
                             default:
                                 break;
                         }
+                        // after a sync, the count_sync_light will increase 1,
+                        // so when the count_sync_light = 1, it means this is
+                        // the first sync light. record start time.
+                        if (count_sync_light == 1) {
+                            servel_synclights_start = t_0_start;
+                        }
+                        // when the count turn to 10, it is a sync calibration
+                        // period.
+                        if ((count_sync_light == 10) &&
+                            (need_sync_calibration == 1)) {
+                            count_sync_light = 0;
+                            servel_synclights_duration =
+                                t_0_start - servel_synclights_start;
+                            gpio_8_toggle();  // debug,remove later
+                            perform_synclight_calibration();
+                            count_calibration += 1;
+                        }
                         break;
                     case type_sweep:
-                        gpio_8_toggle();  // debug,remove later
+                        // gpio_8_toggle();  // debug,remove later
                         //  0 ：NULL,1: next is A,2:next is B
                         flag_station = 1;
 
@@ -399,10 +435,12 @@ int main(void) {
     printf("~~~~my code start~~~~~%d\n", app_vars.count);
 
     config_lighthouse_mote();
-    radio_rxEnable();//openLC,IF?
+    radio_rxEnable();  // openLC,IF?
 
     // clean optical and ex3 interrupt, then re-open ext_3 interrupt
     need_optical = 0;
+    // enbale perform calibration in decode_lighthouse()
+    need_sync_calibration = 1;
 
     // disable all interrupts
     ICER = 0xFFFF;
@@ -426,10 +464,13 @@ int main(void) {
         decode_lighthouse();
         //      wait some time then print to uart
         i++;
-      //i=10,000~=100ms
-        if (i == 10000) {
+        // i=10,000~=100ms(85ms)
+        if (i == 11760) {
             i = 0;
-            sync_light_calibrate_isr();
+            // gpio_8_toggle();
+            // sync_light_calibrate_isr();
+            printf("10 syc: %u, total num: %u\n", servel_synclights_duration,
+                   count_calibration);
             // printf("syc: %u\n", tmp_sync_width);
 
             //            printf("opt_pulse: %u, interval: %u\n",
@@ -442,7 +483,7 @@ int main(void) {
         }
 
         //        printf("Hello World! %d\n", app_vars.count);
-        //        app_vars.count += 1;
+        // app_vars.count += 1;
 
         // for (i = 0; i < 1000000; i++);
     }
