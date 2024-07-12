@@ -469,8 +469,8 @@ int main(void) {
             i = 0;
             // gpio_8_toggle();
             // sync_light_calibrate_isr();
-            printf("10 syc: %u, total num: %u\n", servel_synclights_duration,
-                   count_calibration);
+            // printf("13 syc: %u, total num: %u\n", servel_synclights_duration,
+            //        count_calibration);
             // printf("syc: %u\n", tmp_sync_width);
 
             //            printf("opt_pulse: %u, interval: %u\n",
