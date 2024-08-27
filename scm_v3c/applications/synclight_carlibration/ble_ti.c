@@ -120,10 +120,15 @@ void ble_init(void) {
     ble_vars.name[3] = 'M';
     ble_vars.name[4] = '3';
 
-    // Set appearance to Ambient_light_sensor
+    // Set appearance to Mouse
     ble_vars.appearance_en = true;
     ble_vars.appearance[0] = 0xc2;
     ble_vars.appearance[1] = 0x03;
+
+    ble_vars.tuning_code_tx_en = true;
+    ble_vars.counters_tx_en = true;
+    ble_vars.temperature_tx_en = true;
+    // ble_vars.data_tx_en = true;
 }
 
 void ble_generate_packet(void) {
