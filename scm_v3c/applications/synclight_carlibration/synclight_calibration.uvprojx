@@ -510,6 +510,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\lighthouse_position.c</FilePath>
             </File>
+            <File>
+              <FileName>tuning.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\tuning.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

@@ -9,6 +9,7 @@
 #include "rftimer.h"
 #include "scm3c_hw_interface.h"
 #include "scum_defs.h"
+#include "tuning.h"
 
 //=========================== defines =========================================
 

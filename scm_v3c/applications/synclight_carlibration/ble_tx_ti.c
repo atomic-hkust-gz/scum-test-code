@@ -64,34 +64,34 @@ static void ble_tx_rftimer_callback(void) {
     g_ble_tx_trigger = true;
 }
 
-//int main(void) {
-//    initialize_mote();
+int main_ble(void) {
+   initialize_mote();
 
-//    // Initialize BLE TX.
-//    printf("Initializing BLE TX.\n");
-//    ble_init();
-//    ble_init_tx();
+   // Initialize BLE TX.
+   printf("Initializing BLE TX.\n");
+   ble_init();
+   ble_init_tx();
 
-//    // Configure the RF timer.
-//    rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
-//    rftimer_enable_interrupts();
-//    rftimer_enable_interrupts_by_id(7);
+   // Configure the RF timer.
+   rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
+   rftimer_enable_interrupts();
+   rftimer_enable_interrupts_by_id(7);
 
-//    analog_scan_chain_write();
-//    analog_scan_chain_load();
+   analog_scan_chain_write();
+   analog_scan_chain_load();
 
-//    crc_check();
-//    perform_calibration();
+   crc_check();
+   perform_calibration();
 
-//    // Generate a BLE packet.
-//    ble_generate_packet();
+   // Generate a BLE packet.
+   ble_generate_packet();
 
-//    while (true) {
-//        if (g_ble_tx_trigger) {
-//            printf("Triggering BLE TX.\n");
-//            ble_tx_trigger();
-//            g_ble_tx_trigger = false;
-//            delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
-//        }
-//    }
-//}
+   while (true) {
+       if (g_ble_tx_trigger) {
+           printf("Triggering BLE TX.\n");
+           ble_tx_trigger();
+           g_ble_tx_trigger = false;
+           delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
+       }
+   }
+}
