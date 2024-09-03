@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "ble_ti.h"
 #include "calibrate_interrupt.h"
 #include "gpio.h"
 #include "lighthouse_position.h"
@@ -46,6 +47,18 @@ app_vars_t app_vars;
 
 extern int8_t need_optical;
 
+enum State {
+    // receive light and calculate localization
+    COLLECTING,
+    // use sync light to calibrate clock
+    CALIBRATING,
+    // generate BLE packet which carried location information
+    INTEGRATING,
+    // transmate BLE packet
+    SENDING
+};
+enum State scum_state;
+
 int t;
 // Variables for lighthouse RX, store OPTICAL_DATA_RAW pin state
 unsigned short current_gpio = 0, last_gpio = 0, state = 0, nextstate = 0,
@@ -89,6 +102,59 @@ uint32_t count_calibration = 0;
 #define HF_CLK_RDATA_MSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000)
 #define HF_CLK_COUNT (HF_CLK_RDATA_LSB + (HF_CLK_RDATA_MSB << 16))
 
+// ble variables from ble_tx_ti.c
+/************************************************************************ */
+// If true, sweep through all fine codes.
+#define BLE_TX_SWEEP_FINE true
+//  #define BLE_TX_SWEEP_FINE false
+
+// BLE TX period in milliseconds.
+#define BLE_TX_PERIOD_MS 1000  // milliseconds
+
+// BLE TX tuning code.
+static tuning_code_t g_ble_tx_tuning_code = {
+    .coarse = 19,
+    .mid = 13,
+    .fine = 0,
+};
+
+// BLE TX trigger.
+static bool g_ble_tx_trigger = true;
+
+// Transmit BLE packets.
+static inline void ble_tx_trigger(void) {
+#if BLE_TX_SWEEP_FINE
+    for (uint8_t tx_fine_code = TUNING_MIN_CODE;
+         tx_fine_code <= TUNING_MAX_CODE; ++tx_fine_code) {
+        g_ble_tx_tuning_code.fine = tx_fine_code;
+        tuning_tune_radio(&g_ble_tx_tuning_code);
+        printf("Transmitting BLE packet on %u.%u.%u.\n",
+               g_ble_tx_tuning_code.coarse, g_ble_tx_tuning_code.mid,
+               g_ble_tx_tuning_code.fine);
+
+        // Wait for the frequency to settle.
+        for (uint32_t t = 0; t < 5000; ++t);
+
+        ble_transmit();
+    }
+#else   // !BLE_TX_SWEEP_FINE
+    tuning_tune_radio(&g_ble_tx_tuning_code);
+    printf("Transmitting BLE packet on %u.%u.%u.\n",
+           g_ble_tx_tuning_code.coarse, g_ble_tx_tuning_code.mid,
+           g_ble_tx_tuning_code.fine);
+
+    // Wait for frequency to settle.
+    for (uint32_t t = 0; t < 5000; ++t);
+
+    ble_transmit();
+#endif  // BLE_TX_SWEEP_FINE
+}
+
+static void ble_tx_rftimer_callback(void) {
+    // Trigger a BLE TX.
+    g_ble_tx_trigger = true;
+}
+/************************************************************************ */
 //=========================== prototypes ======================================
 // gpio pins, RFtimer, HCLK... config for lighthouse localization
 void config_lighthouse_mote(void) {
@@ -421,11 +487,16 @@ void decode_lighthouse(void) {
         }
     }
 }
+
+static void update_state() {};
 //=========================== main ============================================
 
 int main(void) {
     uint32_t i;
     uint32_t hf_rdata_lsb, hf_rdata_msb, hf_count_HFclock;  // test HF_CLK
+    uint32_t counter_state;
+    // how many times to transmite ble packets in single SENDING state
+    uint8_t counter_ble_tx;
 
     memset(&app_vars, 0, sizeof(app_vars_t));
 
@@ -440,8 +511,8 @@ int main(void) {
 
     // clean optical and ex3 interrupt, then re-open ext_3 interrupt
     need_optical = 0;
-    // enbale perform calibration in decode_lighthouse()
-    need_sync_calibration = 1;
+    // enbale perform calibration in decode_lighthouse() by set to 1
+    need_sync_calibration = 0;
 
     // disable all interrupts
     ICER = 0xFFFF;
@@ -461,32 +532,88 @@ int main(void) {
     // is 500KHz, interrupt per 1s(1000ms)
     //  here is the timecounter to control print velocity
     i = 0;
+    counter_state = 0;
     while (1) {
-        decode_lighthouse();
-        //      wait some time then print to uart
-        i++;
-        // i=10,000~=100ms(85ms)
-        if (i == 11760) {
-            i = 0;
-            // gpio_8_toggle();
-            // sync_light_calibrate_isr();
-            // printf("13 syc: %u, total num: %u\n", servel_synclights_duration,
-            //        count_calibration);
-            // printf("syc: %u\n", tmp_sync_width);
+        update_state();
+        switch (scum_state) {
+            case COLLECTING:
+                // in this state, we only need location information, so disable
+                // calibration part.
+                need_sync_calibration = 0;
+                // disable all interrupts. rftimer interrupt is used in ble
+                // transmitting
+                ICER = 0xFFFF;
+                decode_lighthouse();
+                //      wait some time then print to uart
+                i++;
+                // i=10,000~=100ms(85ms), a brief printf timer.
+                if (i == 11760) {
+                    i = 0;
+                    // gpio_8_toggle();
+                    // sync_light_calibrate_isr();
+                    // printf("13 syc: %u, total num: %u\n",
+                    // servel_synclights_duration,
+                    //        count_calibration);
+                    // printf("syc: %u\n", tmp_sync_width);
 
-            //            printf("opt_pulse: %u, interval: %u\n",
-            //            t_opt_pulse,loca_duration);
+                    //            printf("opt_pulse: %u, interval: %u\n",
+                    //            t_opt_pulse,loca_duration);
 
-            // printf("hfclk: %u\n", hf_count_HFclock);
+                    // printf("hfclk: %u\n", hf_count_HFclock);
 
-            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X,
-            // B_Y);
+                    // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y,
+                    // B_X, B_Y);
+                }
+
+                //        printf("Hello World! %d\n", app_vars.count);
+                // app_vars.count += 1;
+
+                // for (i = 0; i < 1000000; i++);
+
+                break;
+
+            case CALIBRATING:
+                // to get sync light for calibration must need decode
+                // lighthouse, but can we make this function to two separate
+                // parts? Is that essential?
+                need_sync_calibration = 1;
+                decode_lighthouse();
+            case INTEGRATING:
+                // a small gap used to generate the ble packet. for this
+                // fuction, I think it does not need to be an individual state,
+                // but in this way will be clearly
+                need_sync_calibration = 0;
+                ble_generate_location_packet();
+            case SENDING:
+                // disable synclight calibration
+                need_sync_calibration = 0;
+                // disable all interrupts. Is this step useful or essential?
+                ICER = 0xFFFF;
+                // set this value to control how many times to transmitting
+                counter_ble_tx = 5;
+                // copy from ble_tx(titan version) ble_init();
+                ble_init_tx();
+                analog_scan_chain_write();
+                analog_scan_chain_load();
+
+                // Configure the RF timer.
+                rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
+                rftimer_enable_interrupts();
+                rftimer_enable_interrupts_by_id(7);
+                // transmitting...
+                while (counter_ble_tx) {
+                    if (g_ble_tx_trigger) {
+                        printf("Triggering BLE TX.\n");
+                        ble_tx_trigger();
+                        g_ble_tx_trigger = false;
+                        delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
+                    }
+                    counter_ble_tx--;
+                }
+
+            default:
+                break;
         }
-
-        //        printf("Hello World! %d\n", app_vars.count);
-        // app_vars.count += 1;
-
-        // for (i = 0; i < 1000000; i++);
     }
 }
 

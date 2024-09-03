@@ -27,9 +27,10 @@
 #define BLE_SHORT_NAME_GAP_CODE 0x10
 
 // Appearance
-#define BLE_GAP_APPEARANCE_LENGTH 2 
-#define BLE_GAP_APPEARANCE_HEADER 0xC0 // 1byte GAP code + 2 byte data and inverted
-#define BLE_GAP_APPEARANCE_GAP_CODE 0x98 //(0x19 but inverted)
+#define BLE_GAP_APPEARANCE_LENGTH 2
+#define BLE_GAP_APPEARANCE_HEADER \
+    0xC0  // 1byte GAP code + 2 byte data and inverted
+#define BLE_GAP_APPEARANCE_GAP_CODE 0x98  //(0x19 but inverted)
 
 // Tuning code.
 #define BLE_TUNING_CODE_LENGTH 2
@@ -83,6 +84,10 @@ void ble_init_rx(void);
 // Generate a BLE packet. This function should be called after setting the
 // packet data and before transmitting the packet.
 void ble_generate_packet(void);
+
+// Generate a BLE packet and add location information. This function should be
+// called after setting the packet data and before transmitting the packet.
+void ble_generate_location_packet(void);
 
 // Generate a BLE test packet.
 void ble_generate_test_packet(void);

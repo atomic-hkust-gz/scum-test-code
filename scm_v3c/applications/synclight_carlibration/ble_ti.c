@@ -260,12 +260,149 @@ void ble_generate_packet(void) {
     }
 
     memcpy(&ble_vars.packet[i], pdu_crc, BLE_PDU_LENGTH + BLE_CRC_LENGTH);
-		
-		printf("pkt : ");
-    for (j=0;j<BLE_PDU_LENGTH + BLE_CRC_LENGTH+ 5;j++) {
+
+    printf("pkt : ");
+    for (j = 0; j < BLE_PDU_LENGTH + BLE_CRC_LENGTH + 5; j++) {
         printf("%x ", flipChar(ble_vars.packet[j]));
-		}
-		printf("\r\n");
+    }
+    printf("\r\n");
+}
+
+void ble_generate_location_packet(void) {
+    uint8_t i = 0;
+    uint8_t j = 0;
+
+    int k;
+    uint8_t common;
+    uint8_t crc3 = 0xAA;
+    uint8_t crc2 = 0xAA;
+    uint8_t crc1 = 0xAA;
+
+    uint8_t pdu_crc[BLE_PDU_LENGTH + BLE_CRC_LENGTH];
+
+    uint8_t lfsr = (ble_vars.channel & 0x3F) | (1 << 6);  // [1 channel[6]]
+
+    memset(ble_vars.packet, 0, 64 * sizeof(uint8_t));
+    memset(pdu_crc, 0, (BLE_PDU_LENGTH + BLE_CRC_LENGTH) * sizeof(uint8_t));
+
+    ble_vars.packet[i++] = BLE_PREAMBLE;
+
+    ble_vars.packet[i++] = BLE_ACCESS_ADDRESS1;
+    ble_vars.packet[i++] = BLE_ACCESS_ADDRESS2;
+    ble_vars.packet[i++] = BLE_ACCESS_ADDRESS3;
+    ble_vars.packet[i++] = BLE_ACCESS_ADDRESS4;
+
+    pdu_crc[j++] = BLE_PDU_HEADER1;
+    pdu_crc[j++] = BLE_PDU_HEADER2;
+
+    for (k = BLE_ADVERTISER_ADDRESS_LENGTH - 1; k >= 0; --k) {
+        pdu_crc[j++] = flipChar(ble_vars.advertiser_address[k]);
+    }
+
+    if (ble_vars.name_tx_en) {
+        pdu_crc[j++] = BLE_SHORT_NAME_HEADER;
+        pdu_crc[j++] = BLE_SHORT_NAME_GAP_CODE;
+
+        for (k = 0; k < BLE_SHORT_NAME_LENGTH; ++k) {
+            pdu_crc[j++] = flipChar(ble_vars.name[k]);
+        }
+    }
+
+    if (ble_vars.tuning_code_tx_en) {
+        pdu_crc[j++] = BLE_TUNING_CODE_HEADER;
+        pdu_crc[j++] = BLE_TUNING_CODE_GAP_CODE;
+
+        const uint16_t tuning_code = (ble_vars.tuning_code.coarse << 10) |
+                                     (ble_vars.tuning_code.mid << 5) |
+                                     ble_vars.tuning_code.fine;
+        pdu_crc[j++] =
+            flipChar((tuning_code >> 8) & 0xFF);      // LC freq codes MSB
+        pdu_crc[j++] = flipChar(tuning_code & 0xFF);  // LC freq codes LSB
+    }
+
+    if (ble_vars.counters_tx_en) {
+        pdu_crc[j++] = BLE_COUNTERS_HEADER;
+        pdu_crc[j++] = BLE_COUNTERS_GAP_CODE;
+
+        pdu_crc[j++] =
+            flipChar((ble_vars.count_2M >> 24) & 0xFF);  // count_2M MSB
+        pdu_crc[j++] = flipChar((ble_vars.count_2M >> 16) & 0xFF);
+        pdu_crc[j++] = flipChar((ble_vars.count_2M >> 8) & 0xFF);
+        pdu_crc[j++] = flipChar(ble_vars.count_2M & 0xFF);  // count_2M LSB
+
+        pdu_crc[j++] =
+            flipChar((ble_vars.count_32k >> 24) & 0xFF);  // count_32k MSB
+        pdu_crc[j++] = flipChar((ble_vars.count_32k >> 16) & 0xFF);
+        pdu_crc[j++] = flipChar((ble_vars.count_32k >> 8) & 0xFF);
+        pdu_crc[j++] = flipChar(ble_vars.count_32k & 0xFF);  // count_32k LSB
+    }
+
+    if (ble_vars.temperature_tx_en) {
+        double temperature_kelvin =
+            ble_vars.temperature + 273.15;  // Temperature in Kelvin
+        int temperature_payload =
+            100 * temperature_kelvin + 1;  // Floating point error
+
+        pdu_crc[j++] = BLE_TEMPERATURE_HEADER;
+        pdu_crc[j++] = BLE_TEMPERATURE_GAP_CODE;
+
+        pdu_crc[j++] =
+            flipChar((temperature_payload >> 8) & 0xFF);      // Temperature MSB
+        pdu_crc[j++] = flipChar(temperature_payload & 0xFF);  // Temperature LSB
+    }
+
+    if (ble_vars.data_tx_en) {
+        pdu_crc[j++] = BLE_CUSTOM_DATA_HEADER;
+        pdu_crc[j++] = BLE_CUSTOM_DATA_GAP_CODE;
+
+        for (k = 0; k < BLE_CUSTOM_DATA_LENGTH; ++k) {
+            pdu_crc[j++] = flipChar(ble_vars.data[k]);
+        }
+    }
+
+    if (ble_vars.appearance_en) {
+        pdu_crc[j++] = BLE_GAP_APPEARANCE_HEADER;
+        pdu_crc[j++] = BLE_GAP_APPEARANCE_GAP_CODE;
+
+        for (k = 0; k < BLE_GAP_APPEARANCE_LENGTH; ++k) {
+            pdu_crc[j++] = flipChar(ble_vars.appearance[k]);
+        }
+    }
+
+    for (j = 0; j < BLE_PDU_LENGTH; ++j) {
+        for (k = 7; k >= 0; --k) {
+            common = (crc1 & 1) ^ ((pdu_crc[j] & (1 << k)) >> k);
+            crc1 = (crc1 >> 1) | ((crc2 & 1) << 7);
+            crc2 = ((crc2 >> 1) | ((crc3 & 1) << 7)) ^ (common << 6) ^
+                   (common << 5);
+            crc3 = ((crc3 >> 1) | (common << 7)) ^ (common << 6) ^
+                   (common << 4) ^ (common << 3) ^ (common << 1);
+        }
+    }
+
+    crc1 = flipChar(crc1);
+    crc2 = flipChar(crc2);
+    crc3 = flipChar(crc3);
+
+    pdu_crc[j++] = crc1;
+    pdu_crc[j++] = crc2;
+    pdu_crc[j++] = crc3;
+
+    for (j = 0; j < BLE_PDU_LENGTH + BLE_CRC_LENGTH; ++j) {
+        for (k = 7; k >= 0; --k) {
+            pdu_crc[j] = (pdu_crc[j] & ~(1 << k)) |
+                         ((pdu_crc[j] & (1 << k)) ^ ((lfsr & 1) << k));
+            lfsr = ((lfsr >> 1) | ((lfsr & 1) << 6)) ^ ((lfsr & 1) << 2);
+        }
+    }
+
+    memcpy(&ble_vars.packet[i], pdu_crc, BLE_PDU_LENGTH + BLE_CRC_LENGTH);
+
+    printf("pkt : ");
+    for (j = 0; j < BLE_PDU_LENGTH + BLE_CRC_LENGTH + 5; j++) {
+        printf("%x ", flipChar(ble_vars.packet[j]));
+    }
+    printf("\r\n");
 }
 
 void ble_gen_test_packet(void) {
