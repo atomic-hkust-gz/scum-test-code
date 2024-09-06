@@ -48,6 +48,8 @@ app_vars_t app_vars;
 extern int8_t need_optical;
 
 enum State {
+    // this state, reserved for debugging
+    DEFAULT,
     // receive light and calculate localization
     COLLECTING,
     // use sync light to calibrate clock
@@ -58,6 +60,8 @@ enum State {
     SENDING
 };
 enum State scum_state;
+// a state indicator to memorize current state
+uint8_t counter_state = 0;
 
 int t;
 // Variables for lighthouse RX, store OPTICAL_DATA_RAW pin state
@@ -269,8 +273,74 @@ void config_lighthouse_mote(void) {
     analog_scan_chain_write();
     analog_scan_chain_load();
 }
-// after get 10 sync lights, call this function to calibrate clocks
-void perform_synclight_calibration(void) { sync_light_calibrate_isr(); }
+
+void config_ble_tx_mote(void) {
+    // Set HCLK source as HF_CLOCK
+    set_asc_bit(1147);
+
+    // Set initial coarse/fine on HF_CLOCK
+    // coarse 0:4 = 860 861 875b 876b 877b
+    // fine 0:4 870 871 872 873 874b
+    set_sys_clk_secondary_freq(INIT_HF_CLOCK_COARSE, INIT_HF_CLOCK_FINE);
+
+    // Set RFTimer source as HF_CLOCK
+    set_asc_bit(1151);
+
+    // Disable LF_CLOCK
+    set_asc_bit(553);
+
+    // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 40 to get
+    // 500kHz (inverted, so 1101 0111)
+    set_asc_bit(49);
+    set_asc_bit(48);
+    clear_asc_bit(47);
+    set_asc_bit(46);
+    clear_asc_bit(45);
+    set_asc_bit(44);
+    set_asc_bit(43);
+    set_asc_bit(42);
+
+    // Set 2M RC as source for chip CLK
+    set_asc_bit(1156);
+
+    // Enable 32k for cal
+    set_asc_bit(623);
+
+    // Enable passthrough on chip CLK divider
+    set_asc_bit(41);
+
+    // Init counter setup - set all to analog_cfg control
+    // scm3c_hw_interface_vars.ASC[0] is leftmost
+    // scm3c_hw_interface_vars.ASC[0] |= 0x6F800000;
+    for (t = 2; t < 9; t++) set_asc_bit(t);
+
+    // Init RX
+    radio_init_rx_MF();
+
+    // Init TX
+    radio_init_tx();
+
+    // Set initial IF ADC clock frequency
+    set_IF_clock_frequency(INIT_IF_COARSE, INIT_IF_FINE, 0);
+
+    // Set initial TX clock frequency
+    set_2M_RC_frequency(31, 31, INIT_RC2M_COARSE, INIT_RC2M_FINE,
+                        INIT_RC2M_SUPERFINE);
+
+    // Turn on RC 2M for cal
+    set_asc_bit(1114);
+
+    // Set initial LO frequency
+    LC_monotonic(DEFUALT_INIT_LC_CODE);
+
+    // Init divider settings
+    radio_init_divider(2000);
+
+    // Program analog scan chain
+    analog_scan_chain_write();
+    analog_scan_chain_load();
+    //--------------------------------------------------------
+};
 // a method used to replace old xy distinguish method from kilberg code.
 #define WIDTH_BIAS (0 - 0)
 void distinguish_xy(uint32_t light_duration) {
@@ -315,6 +385,9 @@ int tmp_count_sweep = 0;
 int tmp_count_sync = 0;
 int tmp_count_skip = 0;
 uint32_t tmp_sync_width = 0;
+
+// after get 10 sync lights, call this function to calibrate clocks
+void perform_synclight_calibration(void) { sync_light_calibrate_isr(); }
 
 void decode_lighthouse(void) {
     // This is the main function of lighthouse protocol decoding
@@ -488,7 +561,11 @@ void decode_lighthouse(void) {
     }
 }
 
-static void update_state() {};
+static void update_state(enum State current_state) {
+    if (current_state == DEFAULT) {
+        scum_state = SENDING;
+    }
+};
 //=========================== main ============================================
 
 int main(void) {
@@ -532,14 +609,17 @@ int main(void) {
     // is 500KHz, interrupt per 1s(1000ms)
     //  here is the timecounter to control print velocity
     i = 0;
-    counter_state = 0;
+    scum_state = DEFAULT;
     while (1) {
-        update_state();
+        update_state(scum_state);
         switch (scum_state) {
             case COLLECTING:
+                printf("State: Locating SCUM.\n");
                 // in this state, we only need location information, so disable
                 // calibration part.
                 need_sync_calibration = 0;
+
+                config_lighthouse_mote();
                 // disable all interrupts. rftimer interrupt is used in ble
                 // transmitting
                 ICER = 0xFFFF;
@@ -573,20 +653,27 @@ int main(void) {
                 break;
 
             case CALIBRATING:
+                printf("State: Calibrating.\n");
                 // to get sync light for calibration must need decode
                 // lighthouse, but can we make this function to two separate
                 // parts? Is that essential?
                 need_sync_calibration = 1;
                 decode_lighthouse();
+                break;
             case INTEGRATING:
+                printf("State: Integrating ble packet.\n");
                 // a small gap used to generate the ble packet. for this
                 // fuction, I think it does not need to be an individual state,
                 // but in this way will be clearly
                 need_sync_calibration = 0;
                 ble_generate_location_packet();
+                break;
             case SENDING:
+                printf("State: BLE transimitting.\n");
                 // disable synclight calibration
                 need_sync_calibration = 0;
+
+                config_ble_tx_mote();
                 // disable all interrupts. Is this step useful or essential?
                 ICER = 0xFFFF;
                 // set this value to control how many times to transmitting
@@ -596,12 +683,15 @@ int main(void) {
                 analog_scan_chain_write();
                 analog_scan_chain_load();
 
+                // Generate a BLE packet.
+                ble_generate_packet();
+
                 // Configure the RF timer.
                 rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
                 rftimer_enable_interrupts();
                 rftimer_enable_interrupts_by_id(7);
                 // transmitting...
-                while (counter_ble_tx) {
+                while (true) {  // counter_ble_tx
                     if (g_ble_tx_trigger) {
                         printf("Triggering BLE TX.\n");
                         ble_tx_trigger();
@@ -610,8 +700,14 @@ int main(void) {
                     }
                     counter_ble_tx--;
                 }
+                break;
+            case DEFAULT:
+                printf("State: Scum is running.\n");
+                for (i = 0; i < 1000000; i++);
+                break;
 
             default:
+                printf("Unknown state\n");
                 break;
         }
     }
