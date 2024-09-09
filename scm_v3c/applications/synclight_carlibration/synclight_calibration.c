@@ -118,7 +118,7 @@ uint32_t count_calibration = 0;
 // BLE TX tuning code.
 static tuning_code_t g_ble_tx_tuning_code = {
     .coarse = 19,
-    .mid = 13,
+    .mid = 20,
     .fine = 0,
 };
 
@@ -583,7 +583,7 @@ int main(void) {
     perform_calibration();
     printf("~~~~my code start~~~~~%d\n", app_vars.count);
 
-    config_lighthouse_mote();
+    // config_lighthouse_mote();
     radio_rxEnable();  // openLC,IF?
 
     // clean optical and ex3 interrupt, then re-open ext_3 interrupt
@@ -672,6 +672,7 @@ int main(void) {
                 printf("State: BLE transimitting.\n");
                 // disable synclight calibration
                 need_sync_calibration = 0;
+                
 
                 config_ble_tx_mote();
                 // disable all interrupts. Is this step useful or essential?
@@ -679,6 +680,7 @@ int main(void) {
                 // set this value to control how many times to transmitting
                 counter_ble_tx = 5;
                 // copy from ble_tx(titan version) ble_init();
+                ble_init();
                 ble_init_tx();
                 analog_scan_chain_write();
                 analog_scan_chain_load();

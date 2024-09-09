@@ -60,8 +60,8 @@ void rftimer_init(void) {
     RFTIMER_REG__MAX_COUNT = RFTIMER_MAX_COUNT;
     // enable timer and interrupt
     RFTIMER_REG__CONTROL = 0x07;
-  is_repeating[7]=true;
-  RFTIMER_REG__COMPARE7 = 0x1388;
+//   is_repeating[7]=true;
+//   RFTIMER_REG__COMPARE7 = 0x1388;
 }
 
 void rftimer_set_callback(rftimer_cbt cb) { rftimer_set_callback_by_id(cb, 0); }
