@@ -50,9 +50,12 @@ extern int8_t need_optical;
 enum State {
     // this state, reserved for debugging
     DEFAULT,
-    // receive light and calculate localization
+    // whether localization or calibration, we need to turn on 10M rftimer, use
+    // optical receiver etc. it has two sub state, COLLECTING and CALIBRATING
+    OPTICAL_WORKING,
+    // receive light and calculate localization, sub state of OPTICAL_WORKING
     COLLECTING,
-    // use sync light to calibrate clock
+    // use sync light to calibrate clock, sub state of OPTICAL_WORKING
     CALIBRATING,
     // generate BLE packet which carried location information
     INTEGRATING,
@@ -102,9 +105,9 @@ uint32_t servel_synclights_duration = 0;
 uint32_t count_calibration = 0;
 
 // Read HF_CLK counter,from optical_sfd_isr() at optical.c
-#define HF_CLK_RDATA_LSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000)
-#define HF_CLK_RDATA_MSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000)
-#define HF_CLK_COUNT (HF_CLK_RDATA_LSB + (HF_CLK_RDATA_MSB << 16))
+// #define HF_CLK_RDATA_LSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000)
+// #define HF_CLK_RDATA_MSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000)
+// #define HF_CLK_COUNT (HF_CLK_RDATA_LSB + (HF_CLK_RDATA_MSB << 16))
 
 // ble variables from ble_tx_ti.c
 /************************************************************************ */
@@ -566,6 +569,7 @@ static void update_state(enum State current_state) {
         scum_state = SENDING;
     }
 };
+
 //=========================== main ============================================
 
 int main(void) {
@@ -574,6 +578,8 @@ int main(void) {
     uint32_t counter_state;
     // how many times to transmite ble packets in single SENDING state
     uint8_t counter_ble_tx;
+    uint8_t counter_localization;
+    uint8_t lighthouse_state_period;
 
     memset(&app_vars, 0, sizeof(app_vars_t));
 
@@ -609,11 +615,12 @@ int main(void) {
     // is 500KHz, interrupt per 1s(1000ms)
     //  here is the timecounter to control print velocity
     i = 0;
+    counter_localization = lighthouse_state_period;
     scum_state = DEFAULT;
     while (1) {
         update_state(scum_state);
         switch (scum_state) {
-            case COLLECTING:
+            case OPTICAL_WORKING:
                 printf("State: Locating SCUM.\n");
                 // in this state, we only need location information, so disable
                 // calibration part.
@@ -623,7 +630,31 @@ int main(void) {
                 // disable all interrupts. rftimer interrupt is used in ble
                 // transmitting
                 ICER = 0xFFFF;
-                decode_lighthouse();
+                // close to 2s for changing  state between localization and
+                // calibration
+                counter_localization = lighthouse_state_period;
+
+                while (counter_localization) {
+                    decode_lighthouse();
+                    counter_localization--;
+                    // when comes to the period transfer statement, we use a
+                    // counter to change state
+                    if (counter_localization == 0) {
+                        switch (need_sync_calibration) {
+                            case 0:
+                                need_sync_calibration = 1;
+                                counter_localization =
+                                    lighthouse_state_period + 30000;
+                                break;
+                            case 1:
+                                need_sync_calibration = 0;
+                                counter_localization = lighthouse_state_period;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
                 //      wait some time then print to uart
                 i++;
                 // i=10,000~=100ms(85ms), a brief printf timer.
@@ -672,7 +703,6 @@ int main(void) {
                 printf("State: BLE transimitting.\n");
                 // disable synclight calibration
                 need_sync_calibration = 0;
-                
 
                 config_ble_tx_mote();
                 // disable all interrupts. Is this step useful or essential?
