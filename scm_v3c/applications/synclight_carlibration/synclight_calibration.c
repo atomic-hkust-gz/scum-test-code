@@ -46,6 +46,7 @@ typedef struct {
 app_vars_t app_vars;
 
 extern int8_t need_optical;
+extern optical_vars_t optical_vars;
 
 enum State {
     // this state, reserved for debugging
@@ -571,6 +572,9 @@ static void update_state(enum State current_state) {
     }
 };
 
+bool ble_init_enable = true;
+
+static inline void state_sending(void) {};
 //=========================== main ============================================
 
 int main(void) {
@@ -587,7 +591,7 @@ int main(void) {
     printf("Initializing...");
     initialize_mote();
     crc_check();
-    perform_calibration();
+    // perform_calibration();
     printf("~~~~my code start~~~~~%d\n", app_vars.count);
 
     // config_lighthouse_mote();
@@ -704,6 +708,8 @@ int main(void) {
                 printf("State: BLE transimitting.\n");
                 // disable synclight calibration
                 need_sync_calibration = 0;
+                // now I use optical cal for debugging
+                need_optical = 1;
 
                 config_ble_tx_mote();
                 // disable all interrupts. Is this step useful or essential?
@@ -718,6 +724,7 @@ int main(void) {
 
 #if BLE_CALIBRATE_LC
                 printf("Enable LC calibration\r\n");
+                optical_vars.optical_cal_finished = false;
                 optical_enableLCCalibration();
 
                 // Turn on LO, DIV, PA, and IF
@@ -729,14 +736,8 @@ int main(void) {
                 // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
                 optical_setLCTarget(250182);
 #endif
-
-                // Enable optical SFD interrupt for optical calibration
-                optical_enable();
-
-                // Wait for optical cal to finish
-                while (!optical_getCalibrationFinished());
-
-                printf("Cal complete\r\n");
+                printf("start optical calibration\r\n");
+                perform_calibration();
 
                 // Disable static divider to save power
                 divProgram(480, 0, 0);

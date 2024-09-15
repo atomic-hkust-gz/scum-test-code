@@ -1,3 +1,5 @@
+#include "optical.h"
+
 #include <gpio.h>
 #include <stdio.h>
 #include <string.h>
@@ -9,39 +11,15 @@
 
 //=========================== defines =========================================
 
-#define LC_CAL_COARSE_MIN 24
+#define LC_CAL_COARSE_MIN 19
 #define LC_CAL_COARSE_MAX 25
 #define LC_CAL_MID_MIN 0
 #define LC_CAL_MID_MAX 31
 #define LC_CAL_FINE_MIN 15
 #define LC_CAL_FINE_MAX 15
+#define MIN_LC_DIFF 100
 
 //=========================== variables =======================================
-
-typedef struct {
-    uint8_t optical_cal_iteration;
-    bool optical_cal_finished;
-
-    bool optical_LC_cal_enable;
-    bool optical_LC_cal_finished;
-    uint8_t cal_LC_coarse;
-    uint8_t cal_LC_mid;
-    uint8_t cal_LC_fine;
-    uint32_t cal_LC_diff;
-
-    uint32_t num_32k_ticks_in_100ms;
-    uint32_t num_2MRC_ticks_in_100ms;
-    uint32_t num_IFclk_ticks_in_100ms;
-    uint32_t num_LC_ch11_ticks_in_100ms;
-    uint32_t num_HFclock_ticks_in_100ms;
-
-    // reference to calibrate
-    uint32_t LC_target;
-    uint32_t LC_code;
-    uint8_t LC_coarse;
-    uint8_t LC_mid;
-    uint8_t LC_fine;
-} optical_vars_t;
 
 optical_vars_t optical_vars;
 
@@ -255,22 +233,33 @@ void optical_sfd_isr(void) {
                     printf("count_LC: %u, LC_target: %u, LC_diff: %u\r\n",
                            count_LC, optical_vars.LC_target,
                            optical_vars.cal_LC_diff);
-
-                    ++optical_vars.cal_LC_fine;
-                    if (optical_vars.cal_LC_fine > LC_CAL_FINE_MAX) {
-                        optical_vars.cal_LC_fine = LC_CAL_FINE_MIN;
-                        ++optical_vars.cal_LC_mid;
-                        if (optical_vars.cal_LC_mid > LC_CAL_MID_MAX) {
-                            optical_vars.cal_LC_mid = LC_CAL_MID_MIN;
-                            ++optical_vars.cal_LC_coarse;
-                            // why the stop codition is not related to LC_diff?
-                            if ((optical_vars.cal_LC_coarse >
-                                LC_CAL_COARSE_MAX)||(optical_vars.cal_LC_diff<100)) {
-                                optical_vars.optical_LC_cal_finished = true;
-                                printf("coarse: %u, mid: %u, fine: %u\n",
-                                       optical_vars.LC_coarse,
-                                       optical_vars.LC_mid,
-                                       optical_vars.LC_fine);
+                    printf("coarse: %u, mid: %u, fine: %u\n",
+                           optical_vars.LC_coarse, optical_vars.LC_mid,
+                           optical_vars.LC_fine);
+                    // why the stop codition is not related to LC_diff? I find
+                    // that the mid is correct enought when LC_diff is smaller
+                    // than 100.
+                    if (optical_vars.cal_LC_diff < MIN_LC_DIFF) {
+                        optical_vars.optical_LC_cal_finished = true;
+                    } else {
+                        ++optical_vars.cal_LC_fine;
+                        if (optical_vars.cal_LC_fine > LC_CAL_FINE_MAX) {
+                            optical_vars.cal_LC_fine = LC_CAL_FINE_MIN;
+                            ++optical_vars.cal_LC_mid;
+                            if (optical_vars.cal_LC_mid > LC_CAL_MID_MAX) {
+                                optical_vars.cal_LC_mid = LC_CAL_MID_MIN;
+                                ++optical_vars.cal_LC_coarse;
+                                // why the stop codition is not related to
+                                // LC_diff?
+                                if ((optical_vars.cal_LC_coarse >
+                                     LC_CAL_COARSE_MAX) ||
+                                    (optical_vars.cal_LC_diff < 100)) {
+                                    optical_vars.optical_LC_cal_finished = true;
+                                    printf("coarse: %u, mid: %u, fine: %u\n",
+                                           optical_vars.LC_coarse,
+                                           optical_vars.LC_mid,
+                                           optical_vars.LC_fine);
+                                }
                             }
                         }
                     }
