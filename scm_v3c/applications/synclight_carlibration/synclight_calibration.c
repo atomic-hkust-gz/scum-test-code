@@ -763,7 +763,6 @@ static inline void state_sending(void) {
 //=========================== main ============================================
 
 int main(void) {
-
     memset(&app_vars, 0, sizeof(app_vars_t));
 
     printf("Initializing...");
