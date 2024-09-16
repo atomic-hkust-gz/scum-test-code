@@ -144,11 +144,6 @@ ligththouse_protocal_t lighthouse_ptc = {.current_gpio = 0,
                                          .B_X = 0,
                                          .B_Y = 0};
 
-// Read HF_CLK counter,from optical_sfd_isr() at optical.c
-// #define HF_CLK_RDATA_LSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000)
-// #define HF_CLK_RDATA_MSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000)
-// #define HF_CLK_COUNT (HF_CLK_RDATA_LSB + (HF_CLK_RDATA_MSB << 16))
-
 // ble variables from ble_tx_ti.c
 /************************************************************************ */
 // If true, sweep through all fine codes.
@@ -768,7 +763,6 @@ static inline void state_sending(void) {
 //=========================== main ============================================
 
 int main(void) {
-    uint32_t hf_rdata_lsb, hf_rdata_msb, hf_count_HFclock;  // test HF_CLK
 
     memset(&app_vars, 0, sizeof(app_vars_t));
 
@@ -791,12 +785,6 @@ int main(void) {
 
     //  test rftimer
     // ISER = 0x0080;
-
-    // test HF_CLK
-    // Read HF_CLOCK counter
-    hf_rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
-    hf_rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
-    hf_count_HFclock = hf_rdata_lsb + (hf_rdata_msb << 16);
 
     printf("~~~~start to say HELLO?~~~~~%d\n", app_vars.count);
 
