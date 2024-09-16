@@ -22,10 +22,6 @@
     10  // toggle this pin to show scum received a sync light
 #define OPTICAL_DATA_RAW_PIN \
     ((0x0008 & GPIO_REG__INPUT) >> 3)  // optical receiver digital data pin
-// indicate the type of light
-#define type_sync 0
-#define type_sweep 1
-#define type_skip_sync 2
 
 // initialized value for frequency configuration(from scm3c_hw_interface.c)
 #define INIT_HF_CLOCK_FINE 17
@@ -64,46 +60,89 @@ enum State {
     SENDING
 };
 enum State scum_state;
-// a state indicator to memorize current state
-uint8_t counter_state = 0;
+typedef struct {
+    // store synclight then call synclight calibration
+    uint8_t count_sync_light;
+    // whether enable the synclight calibration
+    uint8_t need_sync_calibration;
+    // record 10 synclight duration
+    uint32_t servel_synclights_start;
+    // uint32_t servel_synclights_end = 0;
+    uint32_t servel_synclights_duration;
+    // total calibration times
+    uint32_t count_calibration;
 
-int t;
-// Variables for lighthouse RX, store OPTICAL_DATA_RAW pin state
-unsigned short current_gpio = 0, last_gpio = 0, state = 0, nextstate = 0,
-               pulse_type = 0;
-unsigned int timestamp_rise, timestamp_fall, pulse_width;
-// variables from lighthouse tracking repo
-uint32_t t_0_start = 0x00;
-uint32_t t_0_end = 0x00;
-uint32_t t_opt_pulse = 0x00;
-uint32_t t_opt_pulse_us = 0x00;
-uint32_t t_1_start = 0x00;
-uint32_t t_d_start = 0x00;
-uint8_t flag_start = 0;
-// 0:sync;1:sweep;2:skip_sync
-uint8_t flag_light_type = 0;
+    // a counter to record how many lighthouse decoding process passed.
+    uint32_t counter_localization;
+    // to set a entire lighthouse localization period duration.
+    uint32_t counter_lighthouse_state_period;
+    // to be a individual timer for recording time.
+    uint32_t counter_global_timer;
+} sync_light_calibration_t;
 
-// after a sweep, wo is the first which is the station A
-uint8_t flag_station = 0;
-// 0：NULL,1:A,2:B
-uint8_t flag_A_station = 0;
-uint32_t loca_duration = 0;
-uint8_t loca_x = 0;
-uint32_t A_X = 0;
-uint32_t A_Y = 0;
-uint32_t B_X = 0;
-uint32_t B_Y = 0;
+sync_light_calibration_t sync_cal = {.count_sync_light = 0,
+                                     .need_sync_calibration = 0,
+                                     .servel_synclights_start = 0,
+                                     .servel_synclights_duration = 0,
+                                     .count_calibration = 0,
+                                     .counter_localization = 0,
+                                     .counter_lighthouse_state_period = 20000,
+                                     .counter_global_timer = 0};
 
-// store synclight then call synclight calibration
-uint8_t count_sync_light = 0;
-// whether enable the synclight calibration
-uint8_t need_sync_calibration = 0;
-// record 10 synclight duration
-uint32_t servel_synclights_start = 0;
-// uint32_t servel_synclights_end = 0;
-uint32_t servel_synclights_duration = 0;
-// total calibration times
-uint32_t count_calibration = 0;
+enum Lighthouse_light_type {
+    // indicate the type of light
+    sync_light,
+    sweep_light,
+    sync_skip_light
+
+};
+typedef struct {
+    // Variables for lighthouse RX, store OPTICAL_DATA_RAW pin state
+    unsigned short current_gpio, last_gpio, state, nextstate, pulse_type;
+    unsigned int timestamp_rise, timestamp_fall, pulse_width;
+    // variables from lighthouse tracking repo
+    uint32_t t_0_start;
+    uint32_t t_0_end;
+    uint32_t t_opt_pulse;
+    uint32_t t_opt_pulse_us;
+    uint32_t t_1_start;
+    uint32_t t_d_start;
+    uint8_t flag_start;
+    // sync;sweep;skip_sync
+    enum Lighthouse_light_type flag_light_type;
+    // after a sweep, wo is the first which is the station A
+    uint8_t flag_station;
+    // 0：NULL,1:A,2:B
+    uint8_t flag_A_station;
+    uint32_t loca_duration;
+    uint8_t loca_x;
+    uint32_t A_X;
+    uint32_t A_Y;
+    uint32_t B_X;
+    uint32_t B_Y;
+} ligththouse_protocal_t;
+
+ligththouse_protocal_t lighthouse_ptc = {.current_gpio = 0,
+                                         .last_gpio = 0,
+                                         .state = 0,
+                                         .nextstate = 0,
+                                         .pulse_type = 0,
+                                         .t_0_start = 0x00,
+                                         .t_0_end = 0x00,
+                                         .t_opt_pulse = 0x00,
+                                         .t_opt_pulse_us = 0x00,
+                                         .t_1_start = 0x00,
+                                         .t_d_start = 0x00,
+                                         .flag_start = 0,
+                                         .flag_light_type = sync_light,
+                                         .flag_station = 0,
+                                         .flag_A_station = 0,
+                                         .loca_duration = 0,
+                                         .loca_x = 0,
+                                         .A_X = 0,
+                                         .A_Y = 0,
+                                         .B_X = 0,
+                                         .B_Y = 0};
 
 // Read HF_CLK counter,from optical_sfd_isr() at optical.c
 // #define HF_CLK_RDATA_LSB *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000)
@@ -167,6 +206,7 @@ static void ble_tx_rftimer_callback(void) {
 //=========================== prototypes ======================================
 // gpio pins, RFtimer, HCLK... config for lighthouse localization
 void config_lighthouse_mote(void) {
+    uint8_t t;
     scm3c_hw_interface_init();
     optical_init();
     radio_init();
@@ -280,6 +320,7 @@ void config_lighthouse_mote(void) {
 }
 
 void config_ble_tx_mote(void) {
+    uint8_t t;
     // Set HCLK source as HF_CLOCK
     set_asc_bit(1147);
 
@@ -356,32 +397,32 @@ void distinguish_xy(uint32_t light_duration) {
     //     loca_x = LASER;  // Laser sweep (THIS NEEDS TUNING)
     if (light_duration < 675 + WIDTH_BIAS &&
         light_duration > 500 + WIDTH_BIAS) {
-        loca_x = 1;  // Azimuth sync, data=0, skip = 0
-        count_sync_light += 1;
+        lighthouse_ptc.loca_x = 1;  // Azimuth sync, data=0, skip = 0
+        sync_cal.count_sync_light += 1;
     } else if (light_duration >= 675 + WIDTH_BIAS &&
                light_duration < 781 + WIDTH_BIAS) {
-        loca_x = 0;  // Elevation sync, data=0, skip = 0
-        count_sync_light += 1;
+        lighthouse_ptc.loca_x = 0;  // Elevation sync, data=0, skip = 0
+        sync_cal.count_sync_light += 1;
     } else if (light_duration >= 781 + WIDTH_BIAS &&
                light_duration < 885 + WIDTH_BIAS) {
-        loca_x = 1;  // Azimuth sync, data=1, skip = 0
-        count_sync_light += 1;
+        lighthouse_ptc.loca_x = 1;  // Azimuth sync, data=1, skip = 0
+        sync_cal.count_sync_light += 1;
     } else if (light_duration >= 885 + WIDTH_BIAS &&
                light_duration < 989 + WIDTH_BIAS) {
-        loca_x = 0;  // Elevation sync, data=1, skip = 0
-        count_sync_light += 1;
+        lighthouse_ptc.loca_x = 0;  // Elevation sync, data=1, skip = 0
+        sync_cal.count_sync_light += 1;
     } else if (light_duration >= 989 + WIDTH_BIAS &&
                light_duration < 1083 + WIDTH_BIAS)
-        loca_x = 1;  // Azimuth sync, data=0, skip = 1
+        lighthouse_ptc.loca_x = 1;  // Azimuth sync, data=0, skip = 1
     else if (light_duration >= 1083 + WIDTH_BIAS &&
              light_duration < 1200 + WIDTH_BIAS)
-        loca_x = 0;  // elevation sync, data=0, skip = 1
+        lighthouse_ptc.loca_x = 0;  // elevation sync, data=0, skip = 1
     else if (light_duration >= 1200 + WIDTH_BIAS &&
              light_duration < 1300 + WIDTH_BIAS)
-        loca_x = 1;  // Azimuth sync, data=1, skip = 1
+        lighthouse_ptc.loca_x = 1;  // Azimuth sync, data=1, skip = 1
     else if (light_duration >= 1300 + WIDTH_BIAS &&
              light_duration < 1400 + WIDTH_BIAS)
-        loca_x = 0;  // Elevation sync, data=1, skip = 1
+        lighthouse_ptc.loca_x = 0;  // Elevation sync, data=1, skip = 1
 }
 // some debug vars, canbe deleted later
 // divide timer then multiply it to make codecompatible
@@ -397,22 +438,22 @@ void perform_synclight_calibration(void) { sync_light_calibrate_isr(); }
 void decode_lighthouse(void) {
     // This is the main function of lighthouse protocol decoding
     // lighthouse code start
-    last_gpio = current_gpio;
-    current_gpio = OPTICAL_DATA_RAW_PIN;
+    lighthouse_ptc.last_gpio = lighthouse_ptc.current_gpio;
+    lighthouse_ptc.current_gpio = OPTICAL_DATA_RAW_PIN;
 
     // Detect rising edge
-    if (last_gpio == 0 && current_gpio == 1) {
+    if (lighthouse_ptc.last_gpio == 0 && lighthouse_ptc.current_gpio == 1) {
         // Reset RF Timer count register at rising edge of first sync pulse
 
         // Save when this event happened
-        timestamp_rise = RFTIMER_REG__COUNTER;
+        lighthouse_ptc.timestamp_rise = RFTIMER_REG__COUNTER;
         //      only for debugging
         gpio_10_toggle();
-        switch (flag_start) {
+        switch (lighthouse_ptc.flag_start) {
             case 0:
-                t_0_start = timestamp_rise;
+                lighthouse_ptc.t_0_start = lighthouse_ptc.timestamp_rise;
 
-                flag_start = 1;
+                lighthouse_ptc.flag_start = 1;
                 break;
             case 1:
                 break;
@@ -423,12 +464,14 @@ void decode_lighthouse(void) {
     }
 
     // Detect falling edge
-    else if (last_gpio == 1 && current_gpio == 0) {
+    else if (lighthouse_ptc.last_gpio == 1 &&
+             lighthouse_ptc.current_gpio == 0) {
         // Save when this event happened
-        timestamp_fall = RFTIMER_REG__COUNTER;
+        lighthouse_ptc.timestamp_fall = RFTIMER_REG__COUNTER;
 
         // Calculate how wide this pulse was
-        pulse_width = timestamp_fall - timestamp_rise;
+        lighthouse_ptc.pulse_width =
+            lighthouse_ptc.timestamp_fall - lighthouse_ptc.timestamp_rise;
         gpio_10_toggle();
         //      gpio_8_toggle();
 
@@ -445,33 +488,35 @@ void decode_lighthouse(void) {
         //            timestamp_fall),
         //                         timestamp_rise);
 
-        switch (flag_start) {
+        switch (lighthouse_ptc.flag_start) {
             case 0:
                 break;
             case 1:
-                t_0_end = timestamp_fall;
-                flag_start = 0;
-                t_opt_pulse = t_0_end - t_0_start;
+                lighthouse_ptc.t_0_end = lighthouse_ptc.timestamp_fall;
+                lighthouse_ptc.flag_start = 0;
+                lighthouse_ptc.t_opt_pulse =
+                    lighthouse_ptc.t_0_end - lighthouse_ptc.t_0_start;
                 // Dividing the two signals by 50us: 0.000,050/(1/10M) = 500
                 // = 0x320,99us(990ticks) for skip/sync
-                (t_opt_pulse <
+                (lighthouse_ptc.t_opt_pulse <
                  500)  // actual boundary condition maybe a little different
-                    ? (flag_light_type = type_sweep)
-                    : ((t_opt_pulse < 990)
-                           ? (flag_light_type = type_sync)
-                           : (flag_light_type = type_skip_sync));
-                t_opt_pulse_us = t_opt_pulse / 10;
-                switch (flag_light_type) {
+                    ? (lighthouse_ptc.flag_light_type = sweep_light)
+                    : ((lighthouse_ptc.t_opt_pulse < 990)
+                           ? (lighthouse_ptc.flag_light_type = sync_light)
+                           : (lighthouse_ptc.flag_light_type =
+                                  sync_skip_light));
+                lighthouse_ptc.t_opt_pulse_us = lighthouse_ptc.t_opt_pulse / 10;
+                switch (lighthouse_ptc.flag_light_type) {
                     // More than 50us then it must be sync, then the next
                     // falling edge interrupt will need to calculate
                     // position
-                    case type_sync:
+                    case sync_light:
                         // If sync, distance measurement starts from this
                         // time.
-                        t_d_start = t_0_start;
+                        lighthouse_ptc.t_d_start = lighthouse_ptc.t_0_start;
                         // It is only based on sweep that you can determine
                         // whether you are currently in A or B.
-                        if (flag_station >= 1) {
+                        if (lighthouse_ptc.flag_station >= 1) {
                             //  Where an even ten digit number is the
                             //  X-axis, an odd number is the Y-axis.
                             // offcourse ,but scum not very accurate, I should
@@ -480,18 +525,18 @@ void decode_lighthouse(void) {
                             //                                  : (loca_x = 0);
 
                             // update loca_x
-                            distinguish_xy(t_opt_pulse);
+                            distinguish_xy(lighthouse_ptc.t_opt_pulse);
                         }
                         // Determine whether this is an A or B base station
                         // based on the value of flag_station
-                        switch (flag_station) {
+                        switch (lighthouse_ptc.flag_station) {
                             case 0:
                                 break;
                             case 1:
-                                flag_A_station = 1;
+                                lighthouse_ptc.flag_A_station = 1;
                                 break;
                             case 2:
-                                flag_A_station = 2;
+                                lighthouse_ptc.flag_A_station = 2;
                                 break;
                             default:
                                 break;
@@ -499,60 +544,67 @@ void decode_lighthouse(void) {
                         // after a sync, the count_sync_light will increase 1,
                         // so when the count_sync_light = 1, it means this is
                         // the first sync light. record start time.
-                        if (count_sync_light == 1) {
-                            servel_synclights_start = t_0_start;
+                        if (sync_cal.count_sync_light == 1) {
+                            sync_cal.servel_synclights_start =
+                                lighthouse_ptc.t_0_start;
                         }
                         // when the count turn to 10, it is a sync calibration
                         // period.
-                        if ((count_sync_light == 10) &&
-                            (need_sync_calibration == 1)) {
-                            count_sync_light = 0;
-                            servel_synclights_duration =
-                                t_0_start - servel_synclights_start;
+                        if ((sync_cal.count_sync_light == 10) &&
+                            (sync_cal.need_sync_calibration == 1)) {
+                            sync_cal.count_sync_light = 0;
+                            sync_cal.servel_synclights_duration =
+                                lighthouse_ptc.t_0_start -
+                                sync_cal.servel_synclights_start;
                             gpio_8_toggle();  // debug,remove later
                             perform_synclight_calibration();
-                            count_calibration += 1;
+                            sync_cal.count_calibration += 1;
                         }
                         break;
-                    case type_sweep:
+                    case sweep_light:
                         // gpio_8_toggle();  // debug,remove later
                         //  0 ：NULL,1: next is A,2:next is B
-                        flag_station = 1;
+                        lighthouse_ptc.flag_station = 1;
 
-                        loca_duration = t_0_start - t_d_start;
-                        switch (flag_A_station) {
+                        lighthouse_ptc.loca_duration =
+                            lighthouse_ptc.t_0_start - lighthouse_ptc.t_d_start;
+                        switch (lighthouse_ptc.flag_A_station) {
                             case 0:
                                 break;
                             // A
                             case 1:
-                                if (loca_x == 1) {
-                                    A_X = loca_duration;
+                                if (lighthouse_ptc.loca_x == 1) {
+                                    lighthouse_ptc.A_X =
+                                        lighthouse_ptc.loca_duration;
                                 } else {
-                                    A_Y = loca_duration;
+                                    lighthouse_ptc.A_Y =
+                                        lighthouse_ptc.loca_duration;
                                 }
-                                flag_A_station = 0;
+                                lighthouse_ptc.flag_A_station = 0;
                                 break;
                             // B
                             case 2:
-                                if (loca_x == 1) {
-                                    B_X = loca_duration;
+                                if (lighthouse_ptc.loca_x == 1) {
+                                    lighthouse_ptc.B_X =
+                                        lighthouse_ptc.loca_duration;
                                 } else {
-                                    B_Y = loca_duration;
+                                    lighthouse_ptc.B_Y =
+                                        lighthouse_ptc.loca_duration;
                                 }
-                                flag_A_station = 0;
+                                lighthouse_ptc.flag_A_station = 0;
                                 break;
                             default:
                                 break;
                         }
 
                         break;
-                    case type_skip_sync:
-                        if (flag_station >= 1) {
-                            flag_station++;
+                    case sync_skip_light:
+                        if (lighthouse_ptc.flag_station >= 1) {
+                            lighthouse_ptc.flag_station++;
                             // Exceeding 2 means that a sweep was not seen,
                             // which often happens.
-                            if (flag_station >= 3) {
-                                flag_station--;
+                            if (lighthouse_ptc.flag_station >= 3) {
+                                lighthouse_ptc.flag_station--;
                             }
                         }
                         break;
@@ -570,21 +622,153 @@ static void update_state(enum State current_state) {
     if (current_state == DEFAULT) {
         scum_state = SENDING;
     }
-};
+}
 
-bool ble_init_enable = true;
+// a counter to record how many lighthouse decoding process passed.
+// uint8_t sync_cal_counter_localization;
+// uint8_t sync_cal_lighthouse_state_period = 20000;
 
-static inline void state_sending(void) {};
+static inline void state_optical_working(void) {
+    printf("State: Locating SCUM.\n");
+    // in this state, we only need location information, so disable
+    // calibration part.
+    sync_cal.need_sync_calibration = 0;
+
+    config_lighthouse_mote();
+    // disable all interrupts. rftimer interrupt is used in ble
+    // transmitting
+    ICER = 0xFFFF;
+    // close to 2s for changing  state between localization and
+    // calibration
+    sync_cal.counter_localization = sync_cal.counter_lighthouse_state_period;
+
+    while (sync_cal.counter_localization) {
+        decode_lighthouse();
+        sync_cal.counter_localization--;
+        // when comes to the period transfer statement, we use a
+        // counter to change state
+        if (sync_cal.counter_localization == 0) {
+            switch (sync_cal.need_sync_calibration) {
+                case 0:
+                    sync_cal.need_sync_calibration = 1;
+                    sync_cal.counter_localization =
+                        sync_cal.counter_lighthouse_state_period + 30000;
+                    break;
+                case 1:
+                    sync_cal.need_sync_calibration = 0;
+                    sync_cal.counter_localization =
+                        sync_cal.counter_lighthouse_state_period;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    //      wait some time then print to uart
+    sync_cal.counter_global_timer++;
+    // i=10,000~=100ms(85ms), a brief printf timer.
+    if (sync_cal.counter_global_timer == 11760) {
+        sync_cal.counter_global_timer = 0;
+        // gpio_8_toggle();
+        // sync_light_calibrate_isr();
+        // printf("13 syc: %u, total num: %u\n",
+        // servel_synclights_duration,
+        //        count_calibration);
+        // printf("syc: %u\n", tmp_sync_width);
+
+        //            printf("opt_pulse: %u, interval: %u\n",
+        //            t_opt_pulse,loca_duration);
+
+        // printf("hfclk: %u\n", hf_count_HFclock);
+
+        // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y,
+        // B_X, B_Y);
+    }
+
+    //        printf("Hello World! %d\n", app_vars.count);
+    // app_vars.count += 1;
+}
+
+// I guess it does not need init each sending state
+bool sync_cal_ble_init_enable = true;
+// how many times to transmite ble packets in single SENDING state
+uint8_t counter_ble_tx;
+
+static inline void state_sending(void) {
+    printf("State: BLE transimitting.\n");
+    // disable synclight calibration
+    sync_cal.need_sync_calibration = 0;
+    // now I use optical cal for debugging
+    need_optical = 1;
+    if (sync_cal_ble_init_enable == true) {
+        config_ble_tx_mote();
+        // disable all interrupts. Is this step useful or essential?
+        ICER = 0xFFFF;
+        // set this value to control how many times to transmitting
+        counter_ble_tx = 5;
+        // copy from ble_tx(titan version) ble_init();
+
+        ble_init();
+        ble_init_tx();
+        analog_scan_chain_write();
+        analog_scan_chain_load();
+    }
+
+#if BLE_CALIBRATE_LC
+    printf("Enable LC calibration\r\n");
+    optical_vars.optical_cal_finished = false;
+    optical_enableLCCalibration();
+
+    // Turn on LO, DIV, PA, and IF
+    ANALOG_CFG_REG__10 = 0x78;
+
+    // Turn off polyphase and disable mixer
+    ANALOG_CFG_REG__16 = 0x6;
+
+    // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
+    optical_setLCTarget(250182);
+#endif
+    printf("start optical calibration\r\n");
+    perform_calibration();
+
+    // Disable static divider to save power
+    divProgram(480, 0, 0);
+
+    // Configure coarse, mid, and fine codes for TX.
+#if BLE_CALIBRATE_LC
+    printf("Set optical LC...\r\n");
+    g_ble_tx_tuning_code.coarse = optical_getLCCoarse();
+    g_ble_tx_tuning_code.mid = optical_getLCMid();
+    g_ble_tx_tuning_code.fine = optical_getLCFine();
+#else
+    // CHANGE THESE VALUES AFTER LC CALIBRATION.
+    // app_vars.tx_coarse = 19;
+    // app_vars.tx_mid = 20;
+    // app_vars.tx_fine = 0;
+#endif
+
+    // Generate a BLE packet.
+    ble_generate_packet();
+
+    // Configure the RF timer.
+    rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
+    rftimer_enable_interrupts();
+    rftimer_enable_interrupts_by_id(7);
+    // transmitting...
+    while (true) {  // counter_ble_tx
+        if (g_ble_tx_trigger) {
+            printf("Triggering BLE TX.\n");
+            ble_tx_trigger();
+            g_ble_tx_trigger = false;
+            delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
+        }
+        counter_ble_tx--;
+    }
+}
 //=========================== main ============================================
 
 int main(void) {
-    uint32_t i;
     uint32_t hf_rdata_lsb, hf_rdata_msb, hf_count_HFclock;  // test HF_CLK
-    uint32_t counter_state;
-    // how many times to transmite ble packets in single SENDING state
-    uint8_t counter_ble_tx;
-    uint8_t counter_localization;
-    uint8_t lighthouse_state_period;
 
     memset(&app_vars, 0, sizeof(app_vars_t));
 
@@ -600,7 +784,7 @@ int main(void) {
     // clean optical and ex3 interrupt, then re-open ext_3 interrupt
     need_optical = 0;
     // enbale perform calibration in decode_lighthouse() by set to 1
-    need_sync_calibration = 0;
+    sync_cal.need_sync_calibration = 0;
 
     // disable all interrupts
     ICER = 0xFFFF;
@@ -619,73 +803,14 @@ int main(void) {
     // delay_milliseconds_asynchronous(1000, 7);//test RFtimer freq,if rftimer
     // is 500KHz, interrupt per 1s(1000ms)
     //  here is the timecounter to control print velocity
-    i = 0;
-    counter_localization = lighthouse_state_period;
+    sync_cal.counter_global_timer = 0;
+    sync_cal.counter_localization = sync_cal.counter_lighthouse_state_period;
     scum_state = DEFAULT;
     while (1) {
         update_state(scum_state);
         switch (scum_state) {
             case OPTICAL_WORKING:
-                printf("State: Locating SCUM.\n");
-                // in this state, we only need location information, so disable
-                // calibration part.
-                need_sync_calibration = 0;
-
-                config_lighthouse_mote();
-                // disable all interrupts. rftimer interrupt is used in ble
-                // transmitting
-                ICER = 0xFFFF;
-                // close to 2s for changing  state between localization and
-                // calibration
-                counter_localization = lighthouse_state_period;
-
-                while (counter_localization) {
-                    decode_lighthouse();
-                    counter_localization--;
-                    // when comes to the period transfer statement, we use a
-                    // counter to change state
-                    if (counter_localization == 0) {
-                        switch (need_sync_calibration) {
-                            case 0:
-                                need_sync_calibration = 1;
-                                counter_localization =
-                                    lighthouse_state_period + 30000;
-                                break;
-                            case 1:
-                                need_sync_calibration = 0;
-                                counter_localization = lighthouse_state_period;
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                }
-                //      wait some time then print to uart
-                i++;
-                // i=10,000~=100ms(85ms), a brief printf timer.
-                if (i == 11760) {
-                    i = 0;
-                    // gpio_8_toggle();
-                    // sync_light_calibrate_isr();
-                    // printf("13 syc: %u, total num: %u\n",
-                    // servel_synclights_duration,
-                    //        count_calibration);
-                    // printf("syc: %u\n", tmp_sync_width);
-
-                    //            printf("opt_pulse: %u, interval: %u\n",
-                    //            t_opt_pulse,loca_duration);
-
-                    // printf("hfclk: %u\n", hf_count_HFclock);
-
-                    // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y,
-                    // B_X, B_Y);
-                }
-
-                //        printf("Hello World! %d\n", app_vars.count);
-                // app_vars.count += 1;
-
-                // for (i = 0; i < 1000000; i++);
-
+                state_optical_working();
                 break;
 
             case CALIBRATING:
@@ -693,7 +818,7 @@ int main(void) {
                 // to get sync light for calibration must need decode
                 // lighthouse, but can we make this function to two separate
                 // parts? Is that essential?
-                need_sync_calibration = 1;
+                sync_cal.need_sync_calibration = 1;
                 decode_lighthouse();
                 break;
             case INTEGRATING:
@@ -701,81 +826,17 @@ int main(void) {
                 // a small gap used to generate the ble packet. for this
                 // fuction, I think it does not need to be an individual state,
                 // but in this way will be clearly
-                need_sync_calibration = 0;
+                sync_cal.need_sync_calibration = 0;
                 ble_generate_location_packet();
                 break;
             case SENDING:
-                printf("State: BLE transimitting.\n");
-                // disable synclight calibration
-                need_sync_calibration = 0;
-                // now I use optical cal for debugging
-                need_optical = 1;
-
-                config_ble_tx_mote();
-                // disable all interrupts. Is this step useful or essential?
-                ICER = 0xFFFF;
-                // set this value to control how many times to transmitting
-                counter_ble_tx = 5;
-                // copy from ble_tx(titan version) ble_init();
-                ble_init();
-                ble_init_tx();
-                analog_scan_chain_write();
-                analog_scan_chain_load();
-
-#if BLE_CALIBRATE_LC
-                printf("Enable LC calibration\r\n");
-                optical_vars.optical_cal_finished = false;
-                optical_enableLCCalibration();
-
-                // Turn on LO, DIV, PA, and IF
-                ANALOG_CFG_REG__10 = 0x78;
-
-                // Turn off polyphase and disable mixer
-                ANALOG_CFG_REG__16 = 0x6;
-
-                // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
-                optical_setLCTarget(250182);
-#endif
-                printf("start optical calibration\r\n");
-                perform_calibration();
-
-                // Disable static divider to save power
-                divProgram(480, 0, 0);
-
-                // Configure coarse, mid, and fine codes for TX.
-#if BLE_CALIBRATE_LC
-                printf("Set optical LC...\r\n");
-                g_ble_tx_tuning_code.coarse = optical_getLCCoarse();
-                g_ble_tx_tuning_code.mid = optical_getLCMid();
-                g_ble_tx_tuning_code.fine = optical_getLCFine();
-#else
-                // CHANGE THESE VALUES AFTER LC CALIBRATION.
-                // app_vars.tx_coarse = 19;
-                // app_vars.tx_mid = 20;
-                // app_vars.tx_fine = 0;
-#endif
-
-                // Generate a BLE packet.
-                ble_generate_packet();
-
-                // Configure the RF timer.
-                rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
-                rftimer_enable_interrupts();
-                rftimer_enable_interrupts_by_id(7);
-                // transmitting...
-                while (true) {  // counter_ble_tx
-                    if (g_ble_tx_trigger) {
-                        printf("Triggering BLE TX.\n");
-                        ble_tx_trigger();
-                        g_ble_tx_trigger = false;
-                        delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
-                    }
-                    counter_ble_tx--;
-                }
+                state_sending();
                 break;
             case DEFAULT:
                 printf("State: Scum is running.\n");
-                for (i = 0; i < 1000000; i++);
+                for (sync_cal.counter_global_timer = 0;
+                     sync_cal.counter_global_timer < 1000000;
+                     sync_cal.counter_global_timer++);
                 break;
 
             default:
