@@ -1,9 +1,13 @@
+#include "gpio.h"
+
+#include "calibrate_interrupt.h"
 #include "memory_map.h"
 #include "optical.h"
-#include "calibrate_interrupt.h"
+
 
 //=========================== define ==========================================
-int8_t need_optical = 1; 
+
+enum State_INTERRUPT_IO8 gpio_ext8_state;
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
@@ -91,20 +95,18 @@ void ext_gpio3_activehigh_debounced_isr() {
 }
 void ext_gpio8_activehigh_isr() {
     // Trigger the interrupt for calibration
-//printf("External Interrupt GPIO8 triggered\r\n");
-  switch(need_optical)
-  {
-    case 1:
-      optical_sfd_isr();
-    break;
-    case 0:
-      sync_light_calibrate_isr();
-//printf("Sync_light_detected!\r\n");
-    break;
-    default:
-      break;
-  }
-
+    // printf("External Interrupt GPIO8 triggered\r\n");
+    switch (gpio_ext8_state) {
+        case OPTICAL_ISR:
+            optical_sfd_isr();
+            break;
+        case SYNC_LIGHT_ISR:
+            sync_light_calibrate_isr();
+            // printf("Sync_light_detected!\r\n");
+            break;
+        default:
+            break;
+    }
 }
 void ext_gpio9_activelow_isr() {
     calibration_isr();

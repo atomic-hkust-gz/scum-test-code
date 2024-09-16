@@ -12,6 +12,7 @@
 #include "scum_defs.h"
 #include "tuning.h"
 
+
 //=========================== defines =========================================
 
 #define CRC_VALUE (*((unsigned int*)0x0000FFFC))
@@ -41,8 +42,9 @@ typedef struct {
 
 app_vars_t app_vars;
 
-extern int8_t need_optical;
+// extern enum need_optical;
 extern optical_vars_t optical_vars;
+extern enum State_INTERRUPT_IO8 gpio_ext8_state;
 
 enum State {
     // this state, reserved for debugging
@@ -694,7 +696,7 @@ static inline void state_sending(void) {
     // disable synclight calibration
     sync_cal.need_sync_calibration = 0;
     // now I use optical cal for debugging
-    need_optical = 1;
+    gpio_ext8_state = OPTICAL_ISR;
     if (sync_cal_ble_init_enable == true) {
         config_ble_tx_mote();
         // disable all interrupts. Is this step useful or essential?
@@ -775,7 +777,7 @@ int main(void) {
     radio_rxEnable();  // openLC,IF?
 
     // clean optical and ex3 interrupt, then re-open ext_3 interrupt
-    need_optical = 0;
+    gpio_ext8_state = SYNC_LIGHT_ISR;
     // enbale perform calibration in decode_lighthouse() by set to 1
     sync_cal.need_sync_calibration = 0;
 

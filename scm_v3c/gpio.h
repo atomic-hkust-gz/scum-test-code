@@ -6,7 +6,13 @@
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
+enum State_INTERRUPT_IO8 {
+    // will trigger optical isr
+    OPTICAL_ISR,
+    // will trigger sync light calibration isr
+    SYNC_LIGHT_ISR,
 
+};
 //=========================== prototypes ======================================
 
 void gpio_init(void);
