@@ -1,9 +1,10 @@
 #include "gpio.h"
 
+#include <stdio.h>
+
 #include "calibrate_interrupt.h"
 #include "memory_map.h"
 #include "optical.h"
-
 
 //=========================== define ==========================================
 

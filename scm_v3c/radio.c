@@ -233,17 +233,17 @@ void repeat_rx_tx(repeat_rx_tx_params_t repeat_rx_tx_params) {
     uint8_t pkt_len_fix = repeat_rx_tx_params.pkt_len;
 
     int pkt_count = 0;
-    char* radio_mode_string;
-    char* repeat_mode_string;
+    //    char* radio_mode_string;
+    //    char* repeat_mode_string;
 
     uint8_t i;
 
-    if (repeat_rx_tx_params.radio_mode == TX_MODE) {
-        radio_mode_string = "transmit";
+    //    if (repeat_rx_tx_params.radio_mode == TX_MODE) {
+    //        radio_mode_string = "transmit";
 
-    } else {
-        radio_mode_string = "receive";
-    }
+    //    } else {
+    //        radio_mode_string = "receive";
+    //    }
 
     if (repeat_rx_tx_params.repeat_mode == FIXED) {
         cfg_coarse_start = repeat_rx_tx_params.fixed_lc_coarse;
@@ -445,7 +445,7 @@ void radio_loadPacket(void* packet, uint16_t len) {
     memcpy(radio_vars.radio_tx_buffer, packet, len);
 
     // load packet in TXFIFO
-    RFCONTROLLER_REG__TX_DATA_ADDR = radio_vars.radio_tx_buffer;
+    RFCONTROLLER_REG__TX_DATA_ADDR = (char*)radio_vars.radio_tx_buffer;
     RFCONTROLLER_REG__TX_PACK_LEN = len;
 
     RFCONTROLLER_REG__CONTROL = TX_LOAD;
@@ -496,7 +496,7 @@ void radio_rxEnable() {
     ANALOG_CFG_REG__16 = 0x1;
 
     // Where packet will be stored in memory
-    DMA_REG__RF_RX_ADDR = radio_vars.radio_rx_buffer;
+    DMA_REG__RF_RX_ADDR = (char*)radio_vars.radio_rx_buffer;
 
     // Reset radio FSM
     RFCONTROLLER_REG__CONTROL = RF_RESET;
@@ -515,7 +515,7 @@ void radio_rxNow() {
 void radio_getReceivedFrame(uint8_t* pBufRead, uint8_t* pLenRead,
                             uint8_t maxBufLen, int8_t* pRssi, uint8_t* pLqi) {
     //===== rssi
-    *pRssi = read_RSSI() + RSSI_REFERENCE;
+    *pRssi = (int8_t)read_RSSI() + RSSI_REFERENCE;
 
     //===== lqi
     *pLqi = read_LQI();
@@ -552,7 +552,7 @@ void radio_frequency_housekeeping(uint32_t IF_estimate,
     unsigned int IF_est_filtered;
     signed int chip_rate_error_ppm, chip_rate_error_ppm_filtered;
     unsigned short packet_len;
-    signed int timing_correction;
+    //    signed int timing_correction;
 
     uint32_t IF_coarse;
     uint32_t IF_fine;

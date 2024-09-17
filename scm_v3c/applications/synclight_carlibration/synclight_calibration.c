@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 
 #include "ble_ti.h"
@@ -90,11 +91,13 @@ sync_light_calibration_t sync_cal = {.count_sync_light = 0,
                                      .counter_localization = 0,
                                      .counter_lighthouse_state_period = 20000,
                                      .counter_global_timer = 0};
-
+// indicate the type of light
 enum Lighthouse_light_type {
-    // indicate the type of light
+    // duration longer than 50ms
     sync_light,
+    // duration shorter than 30ms(usually 15ms)
     sweep_light,
+    // duration longer than 100ms
     sync_skip_light
 
 };
@@ -118,9 +121,13 @@ typedef struct {
     uint8_t flag_A_station;
     uint32_t loca_duration;
     uint8_t loca_x;
+    // angle x output from lighthouse station A
     uint32_t A_X;
+    // angle y output from lighthouse station A
     uint32_t A_Y;
+    // angle x output from lighthouse station B
     uint32_t B_X;
+    // angle x output from lighthouse station B
     uint32_t B_Y;
 } ligththouse_protocal_t;
 

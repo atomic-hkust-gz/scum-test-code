@@ -117,9 +117,9 @@ void optical_sfd_isr(void) {
     // 1.1V/VDDD tap fix
     // helps reorder assembly code
     // Not completely sure why this works
-    uint32_t dummy = 0;
+    //    uint32_t dummy = 0;
 
-    int32_t t;
+    //    int32_t t;
     uint32_t rdata_lsb, rdata_msb;
     uint32_t count_LC, count_32k, count_2M, count_HFclock, count_IF;
 
@@ -128,7 +128,7 @@ void optical_sfd_isr(void) {
     uint32_t RC2M_coarse;
     uint32_t RC2M_fine;
     uint32_t RC2M_superfine;
-    uint32_t IF_clk_target;
+    //    uint32_t IF_clk_target;
     uint32_t IF_coarse;
     uint32_t IF_fine;
 
@@ -137,7 +137,7 @@ void optical_sfd_isr(void) {
     RC2M_coarse = scm3c_hw_interface_get_RC2M_coarse();
     RC2M_fine = scm3c_hw_interface_get_RC2M_fine();
     RC2M_superfine = scm3c_hw_interface_get_RC2M_superfine();
-    IF_clk_target = scm3c_hw_interface_get_IF_clk_target();
+    //    IF_clk_target = scm3c_hw_interface_get_IF_clk_target();
     IF_coarse = scm3c_hw_interface_get_IF_coarse();
     IF_fine = scm3c_hw_interface_get_IF_fine();
 

@@ -60,8 +60,8 @@ void rftimer_init(void) {
     RFTIMER_REG__MAX_COUNT = RFTIMER_MAX_COUNT;
     // enable timer and interrupt
     RFTIMER_REG__CONTROL = 0x07;
-//   is_repeating[7]=true;
-//   RFTIMER_REG__COMPARE7 = 0x1388;
+    //   is_repeating[7]=true;
+    //   RFTIMER_REG__COMPARE7 = 0x1388;
 }
 
 void rftimer_set_callback(rftimer_cbt cb) { rftimer_set_callback_by_id(cb, 0); }
@@ -180,7 +180,7 @@ void delay_milliseconds_synchronous(unsigned int delay_milli, uint8_t id) {
 }
 
 // ========================== interrupt =======================================
-//#define ENABLE_PRINTF
+// #define ENABLE_PRINTF
 void rftimer_isr(void) {
     uint16_t interrupt;
     int i = 0;
@@ -195,7 +195,7 @@ void rftimer_isr(void) {
 #ifdef ENABLE_PRINTF
             printf("COMPARE%d MATCH\r\n", i);
 #endif
-  gpio_10_toggle();//for freq test
+            gpio_10_toggle();  // for freq test
             handle_interrupt(i);
         }
 

@@ -195,8 +195,7 @@ void crc_check(void) {
         printf(
             "\r\nProgramming Error - CRC DOES NOT MATCH - Halting "
             "Execution\r\n");
-        while (1)
-            ;
+        while (1);
     }
 }
 
@@ -1191,11 +1190,11 @@ void initialize_mote() {
     set_asc_bit(43);
     set_asc_bit(42);
 
-    //can be removed
-    // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
-    // 10MHz (inverted, so 0000 0010-->1111 1101)
-    // infact, the max freq is 10M, 20M need to raise the supply voltage for
-    // VDDD. once change HCLK, UART baudrate will change too.
+    // can be removed
+    //  HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
+    //  10MHz (inverted, so 0000 0010-->1111 1101)
+    //  infact, the max freq is 10M, 20M need to raise the supply voltage for
+    //  VDDD. once change HCLK, UART baudrate will change too.
     set_asc_bit(49);
     set_asc_bit(48);
     set_asc_bit(47);
@@ -1205,13 +1204,13 @@ void initialize_mote() {
     clear_asc_bit(43);
     set_asc_bit(42);
 
-    //can be removed
-    // try to use divider on HFCLK
-    // Set HCLK divider to 2(0000 0010->0000 0110,only third low bit need
-    // invert) infact, the max freq is 10M, 20M need to raise the supply voltage
-    // for VDDD. HCLK is for cortex core, if you do not set it to 10M, it stay
-    // at 5M by default. if HCLK is 5M, RFtimer can not faster than 5M. I do not
-    // know the reason.
+    // can be removed
+    //  try to use divider on HFCLK
+    //  Set HCLK divider to 2(0000 0010->0000 0110,only third low bit need
+    //  invert) infact, the max freq is 10M, 20M need to raise the supply
+    //  voltage for VDDD. HCLK is for cortex core, if you do not set it to 10M,
+    //  it stay at 5M by default. if HCLK is 5M, RFtimer can not faster than 5M.
+    //  I do not know the reason.
     clear_asc_bit(57);
     clear_asc_bit(56);
     clear_asc_bit(55);
@@ -1220,7 +1219,6 @@ void initialize_mote() {
     set_asc_bit(52);  // inverted
     set_asc_bit(51);
     clear_asc_bit(50);
-
 
     // Set 2M RC as source for chip CLK
     set_asc_bit(1156);
@@ -1278,8 +1276,7 @@ unsigned int estimate_temperature_2M_32k() {
     ANALOG_CFG_REG__0 = 0x3FFF;
 
     // Count for some arbitrary amount of time
-    for (t = 1; t < 50000; t++)
-        ;
+    for (t = 1; t < 50000; t++);
 
     // Disable all counters
     ANALOG_CFG_REG__0 = 0x007F;
