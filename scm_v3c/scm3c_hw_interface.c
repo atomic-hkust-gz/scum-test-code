@@ -1195,14 +1195,14 @@ void initialize_mote() {
     //  10MHz (inverted, so 0000 0010-->1111 1101)
     //  infact, the max freq is 10M, 20M need to raise the supply voltage for
     //  VDDD. once change HCLK, UART baudrate will change too.
-    set_asc_bit(49);
-    set_asc_bit(48);
-    set_asc_bit(47);
-    set_asc_bit(46);
-    set_asc_bit(45);
-    set_asc_bit(44);
-    clear_asc_bit(43);
-    set_asc_bit(42);
+    // set_asc_bit(49);
+    // set_asc_bit(48);
+    // set_asc_bit(47);
+    // set_asc_bit(46);
+    // set_asc_bit(45);
+    // set_asc_bit(44);
+    // clear_asc_bit(43);
+    // set_asc_bit(42);
 
     // can be removed
     //  try to use divider on HFCLK
@@ -1211,14 +1211,14 @@ void initialize_mote() {
     //  voltage for VDDD. HCLK is for cortex core, if you do not set it to 10M,
     //  it stay at 5M by default. if HCLK is 5M, RFtimer can not faster than 5M.
     //  I do not know the reason.
-    clear_asc_bit(57);
-    clear_asc_bit(56);
-    clear_asc_bit(55);
-    clear_asc_bit(54);
-    clear_asc_bit(53);
-    set_asc_bit(52);  // inverted
-    set_asc_bit(51);
-    clear_asc_bit(50);
+    // clear_asc_bit(57);
+    // clear_asc_bit(56);
+    // clear_asc_bit(55);
+    // clear_asc_bit(54);
+    // clear_asc_bit(53);
+    // set_asc_bit(52);  // inverted
+    // set_asc_bit(51);
+    // clear_asc_bit(50);
 
     // Set 2M RC as source for chip CLK
     set_asc_bit(1156);
@@ -1253,7 +1253,8 @@ void initialize_mote() {
     set_asc_bit(1114);
 
     // Set initial LO frequency
-    LC_monotonic(DEFUALT_INIT_LC_CODE);
+    LC_FREQCHANGE(DEFAULT_INIT_LC_COARSE, DEFAULT_INIT_LC_MID,
+                  DEFAULT_INIT_LC_FINE);
 
     // Init divider settings
     radio_init_divider(2000);

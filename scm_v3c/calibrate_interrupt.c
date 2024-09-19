@@ -57,7 +57,7 @@ void sync_light_calibrate_init(void) {
     // Divide ratio is currently 480*2
     // Calibration counts for 100ms
     synclight_cal_vars.LC_target = REFERENCE_LC_TARGET;
-    synclight_cal_vars.LC_code = DEFUALT_INIT_LC_CODE;
+    synclight_cal_vars.LC_code = DEFAULT_INIT_LC_CODE;
 }
 
 void sync_light_calibrate_isr(void) {

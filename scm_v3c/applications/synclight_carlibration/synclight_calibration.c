@@ -43,7 +43,6 @@ typedef struct {
 
 app_vars_t app_vars;
 
-// extern enum need_optical;
 extern optical_vars_t optical_vars;
 extern enum State_INTERRUPT_IO8 gpio_ext8_state;
 
@@ -127,7 +126,7 @@ typedef struct {
     uint32_t A_Y;
     // angle x output from lighthouse station B
     uint32_t B_X;
-    // angle x output from lighthouse station B
+    // angle y output from lighthouse station B
     uint32_t B_Y;
 } ligththouse_protocal_t;
 
@@ -159,14 +158,15 @@ ligththouse_protocal_t lighthouse_ptc = {.current_gpio = 0,
 #define BLE_TX_SWEEP_FINE true
 //  #define BLE_TX_SWEEP_FINE false
 #define BLE_CALIBRATE_LC true
-
+//  LC cal gives an optimal value, but we can decide whether use this.
+#define BLE_USE_OPTIMAL_LC true
 // BLE TX period in milliseconds.
 #define BLE_TX_PERIOD_MS 1000  // milliseconds
 
 // BLE TX tuning code.
 static tuning_code_t g_ble_tx_tuning_code = {
     .coarse = 19,
-    .mid = 20,
+    .mid = 2,
     .fine = 0,
 };
 
@@ -314,7 +314,7 @@ void config_lighthouse_mote(void) {
     set_asc_bit(1114);  // cr
 
     // Set initial LO frequency
-    LC_monotonic(DEFUALT_INIT_LC_CODE);
+    LC_monotonic(DEFAULT_INIT_LC_CODE);
 
     // Init divider settings
     radio_init_divider(2000);
@@ -325,6 +325,38 @@ void config_lighthouse_mote(void) {
 
 void config_ble_tx_mote(void) {
     uint8_t t;
+
+    scm3c_hw_interface_init();
+    optical_init();
+    radio_init();
+    rftimer_init();
+    ble_init();
+
+    //--------------------------------------------------------
+    // SCM3C Analog Scan Chain Initialization
+    //--------------------------------------------------------
+    // Init LDO control
+    init_ldo_control();
+
+    // Set LDO reference voltages
+    // set_VDDD_LDO_voltage(0);
+    // set_AUX_LDO_voltage(0);
+    // set_ALWAYSON_LDO_voltage(0);
+
+    // Select banks for GPIO inputs
+    GPI_control(0,0,1,0); // 1 in 3rd arg connects GPI8 to EXT_INTERRUPT<1> needed for 3WB cal 
+
+    // Select banks for GPIO outputs
+    GPO_control(6,6,0,6); // 0 in 3rd arg connects clk_3wb to GPO8 for 3WB cal
+
+    // Set all GPIOs as outputs
+    // Set GPI enables
+    // Hex entry 2: 0x1 = 1 = 0b0001 = GPI 8 on for 3WB cal clk interrupt
+    GPI_enables(0x0100);
+
+    // Set HCLK source as HF_CLOCK
+    GPO_enables(0xFFFF); 
+
     // Set HCLK source as HF_CLOCK
     set_asc_bit(1147);
 
@@ -381,7 +413,7 @@ void config_ble_tx_mote(void) {
     set_asc_bit(1114);
 
     // Set initial LO frequency
-    LC_monotonic(DEFUALT_INIT_LC_CODE);
+    LC_monotonic(DEFAULT_INIT_LC_CODE);
 
     // Init divider settings
     radio_init_divider(2000);
@@ -430,11 +462,11 @@ void distinguish_xy(uint32_t light_duration) {
 }
 // some debug vars, canbe deleted later
 // divide timer then multiply it to make codecompatible
-int para_temp = 1;
-int tmp_count_sweep = 0;
-int tmp_count_sync = 0;
-int tmp_count_skip = 0;
-uint32_t tmp_sync_width = 0;
+// int para_temp = 1;
+// int tmp_count_sweep = 0;
+// int tmp_count_sync = 0;
+// int tmp_count_skip = 0;
+// uint32_t tmp_sync_width = 0;
 
 // after get 10 sync lights, call this function to calibrate clocks
 void perform_synclight_calibration(void) { sync_light_calibrate_isr(); }
@@ -775,7 +807,10 @@ int main(void) {
     memset(&app_vars, 0, sizeof(app_vars_t));
 
     printf("Initializing...");
-    initialize_mote();
+
+    // initialize_mote();
+    config_ble_tx_mote();
+
     crc_check();
     // perform_calibration();
     printf("~~~~my code start~~~~~%d\n", app_vars.count);
