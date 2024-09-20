@@ -738,23 +738,29 @@ static inline void state_sending(void) {
     // now I use optical cal for debugging
     gpio_ext8_state = OPTICAL_ISR;
 
-    initialize_mote();
+    // set this value to control how many times to transmitting
+    counter_ble_tx = 5;
 
-    // Initialize BLE TX.
-    printf("Initializing BLE TX.\n");
-    ble_init();
-    ble_init_tx();
+    if (sync_cal_ble_init_enable == true) {
+        // initialize_mote();
+        config_ble_tx_mote();
 
-    // Configure the RF timer.
-    rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
-    rftimer_enable_interrupts();
-    rftimer_enable_interrupts_by_id(7);
+        // Initialize BLE TX.
+        printf("Initializing BLE TX.\n");
+        ble_init();
+        ble_init_tx();
 
-    analog_scan_chain_write();
-    analog_scan_chain_load();
+        // Configure the RF timer.
+        rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
+        rftimer_enable_interrupts();
+        rftimer_enable_interrupts_by_id(7);
 
-    crc_check();
-    perform_calibration();
+        analog_scan_chain_write();
+        analog_scan_chain_load();
+
+        crc_check();
+        // perform_calibration();
+    }
 
 #if BLE_CALIBRATE_LC
     optical_vars.optical_cal_finished = false;
@@ -769,8 +775,10 @@ static inline void state_sending(void) {
     // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
     optical_setLCTarget(250182);
 #endif
+    // Do not use perfom_calibration() here, it has radio_rxEnable() function,
+    // which will affect accuracy Enable optical SFD interrupt for optical
+    // calibration
 
-    // Enable optical SFD interrupt for optical calibration
     optical_enable();
 
     // Wait for optical cal to finish
@@ -796,81 +804,15 @@ static inline void state_sending(void) {
     // Generate a BLE packet.
     ble_generate_packet();
 
-    while (true) {
+    while (true) {  // counter_ble_tx
         if (g_ble_tx_trigger) {
             printf("Triggering BLE TX.\n");
             ble_tx_trigger();
             g_ble_tx_trigger = false;
             delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
         }
+        // counter_ble_tx--;
     }
-
-    //     if (sync_cal_ble_init_enable == true) {
-    //         config_ble_tx_mote();
-    //         // disable all interrupts. Is this step useful or essential?
-    //         ICER = 0xFFFF;
-    //         // set this value to control how many times to transmitting
-    //         counter_ble_tx = 5;
-    //         // copy from ble_tx(titan version) ble_init();
-
-    //         ble_init();
-    //         ble_init_tx();
-
-    //         // Configure the RF timer.
-    //         rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
-    //         rftimer_enable_interrupts();
-    //         rftimer_enable_interrupts_by_id(7);
-
-    //         analog_scan_chain_write();
-    //         analog_scan_chain_load();
-    //     }
-
-    // #if BLE_CALIBRATE_LC
-    //     printf("Enable LC calibration\r\n");
-    //     optical_vars.optical_cal_finished = false;
-    //     optical_enableLCCalibration();
-
-    //     // Turn on LO, DIV, PA, and IF
-    //     ANALOG_CFG_REG__10 = 0x78;
-
-    //     // Turn off polyphase and disable mixer
-    //     ANALOG_CFG_REG__16 = 0x6;
-
-    //     // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
-    //     optical_setLCTarget(250182);
-    // #endif
-    //     printf("start optical calibration\r\n");
-    //     perform_calibration();
-
-    //     // Disable static divider to save power
-    //     divProgram(480, 0, 0);
-
-    //     // Configure coarse, mid, and fine codes for TX.
-    // #if BLE_CALIBRATE_LC
-    //     printf("Set optical LC...\r\n");
-    //     g_ble_tx_tuning_code.coarse = optical_getLCCoarse();
-    //     g_ble_tx_tuning_code.mid = optical_getLCMid();
-    //     g_ble_tx_tuning_code.fine = optical_getLCFine();
-    // #else
-    //     // CHANGE THESE VALUES AFTER LC CALIBRATION.
-    //     // app_vars.tx_coarse = 19;
-    //     // app_vars.tx_mid = 20;
-    //     // app_vars.tx_fine = 0;
-    // #endif
-
-    //     // Generate a BLE packet.
-    //     ble_generate_packet();
-
-    //     // transmitting...
-    //     while (true) {  // counter_ble_tx
-    //         if (g_ble_tx_trigger) {
-    //             printf("Triggering BLE TX.\n");
-    //             ble_tx_trigger();
-    //             g_ble_tx_trigger = false;
-    //             delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
-    //         }
-    //         counter_ble_tx--;
-    //     }
 }
 //=========================== main ============================================
 
