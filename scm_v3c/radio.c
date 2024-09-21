@@ -69,8 +69,8 @@ signed short cdr_tau_history[11] = {0};
 //===== RFTIMER
 // #define TIMER_PERIOD_TX        250000           ///< 500 = 1ms@500kHz
 // #define TIMER_PERIOD_RX        200000           ///< 500 = 1ms@500kHz
-#define TIMER_PERIOD_TX 4000  ///< 500 = 1ms@500kHz
-#define TIMER_PERIOD_RX 4000  ///< 500 = 1ms@
+#define TIMER_PERIOD_TX 2000  ///< 500 = 1ms@500kHz
+#define TIMER_PERIOD_RX 2000  ///< 500 = 1ms@
 // #define TIMER_PERIOD_RX        10000           ///< 500 = 1ms@500kHz
 
 #define RX_PKT_ANY_LEN \

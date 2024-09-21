@@ -43,6 +43,7 @@ typedef struct {
 app_vars_t app_vars;
 
 extern optical_vars_t optical_vars;
+extern synclight_calibrate_vars_t synclight_cal_vars;
 extern enum State_INTERRUPT_IO8 gpio_ext8_state;
 
 enum State {
@@ -327,6 +328,8 @@ void config_ble_tx_mote(void) {
 
     scm3c_hw_interface_init();
     optical_init();
+    // a copy of optical_init
+    sync_light_calibrate_init();
     radio_init();
     rftimer_init();
     ble_init();
@@ -470,7 +473,7 @@ void distinguish_xy(uint32_t light_duration) {
 // uint32_t tmp_sync_width = 0;
 
 // after get 10 sync lights, call this function to calibrate clocks
-void perform_synclight_calibration(void) { sync_light_calibrate_isr(); }
+// void perform_synclight_calibration(void) { sync_light_calibrate_isr(); }
 
 void decode_lighthouse(void) {
     // This is the main function of lighthouse protocol decoding
@@ -726,6 +729,7 @@ static inline void state_optical_working(void) {
     // app_vars.count += 1;
 }
 
+static inline void state_calibrating(void) {}
 // I guess it does not need init each sending state
 bool sync_cal_ble_init_enable = true;
 // how many times to transmite ble packets in single SENDING state
@@ -736,7 +740,8 @@ static inline void state_sending(void) {
     // disable synclight calibration
     sync_cal.need_sync_calibration = 0;
     // now I use optical cal for debugging
-    gpio_ext8_state = OPTICAL_ISR;
+    // gpio_ext8_state = OPTICAL_ISR;
+    gpio_ext8_state = SYNC_LIGHT_ISR;
 
     // set this value to control how many times to transmitting
     counter_ble_tx = 5;
@@ -763,8 +768,11 @@ static inline void state_sending(void) {
     }
 
 #if BLE_CALIBRATE_LC
-    optical_vars.optical_cal_finished = false;
-    optical_enableLCCalibration();
+    // optical_vars.optical_cal_finished = false;
+    // optical_enableLCCalibration();
+
+    synclight_cal_vars.optical_cal_finished = false;
+    synclight_cal_enableLCCalibration();
 
     // Turn on LO, DIV, PA, and IF
     ANALOG_CFG_REG__10 = 0x78;
@@ -773,16 +781,18 @@ static inline void state_sending(void) {
     ANALOG_CFG_REG__16 = 0x6;
 
     // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
-    optical_setLCTarget(250182);
+    // optical_setLCTarget(250182);
+    synclight_cal_setLCTarget(250182);
 #endif
     // Do not use perfom_calibration() here, it has radio_rxEnable() function,
-    // which will affect accuracy Enable optical SFD interrupt for optical
-    // calibration
+    // which will affect accuracy.
 
+    //  Enable optical SFD interrupt for optical calibration
     optical_enable();
 
     // Wait for optical cal to finish
-    while (!optical_getCalibrationFinished());
+    // while (!optical_getCalibrationFinished());
+    while (!synclight_cal_getCalibrationFinished());
 
     printf("Cal complete\r\n");
 
@@ -791,9 +801,13 @@ static inline void state_sending(void) {
 
     // Configure coarse, mid, and fine codes for TX.
 #if BLE_CALIBRATE_LC
-    g_ble_tx_tuning_code.coarse = optical_getLCCoarse();
-    g_ble_tx_tuning_code.mid = optical_getLCMid();
-    g_ble_tx_tuning_code.fine = optical_getLCFine();
+    // g_ble_tx_tuning_code.coarse = optical_getLCCoarse();
+    // g_ble_tx_tuning_code.mid = optical_getLCMid();
+    // g_ble_tx_tuning_code.fine = optical_getLCFine();
+
+    g_ble_tx_tuning_code.coarse = synclight_cal_getLCCoarse();
+    g_ble_tx_tuning_code.mid = synclight_cal_getLCMid();
+    g_ble_tx_tuning_code.fine = synclight_cal_getLCFine();
 #else
     // CHANGE THESE VALUES AFTER LC CALIBRATION.
     app_vars.tx_coarse = 23;
