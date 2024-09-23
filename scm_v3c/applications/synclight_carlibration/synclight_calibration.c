@@ -166,7 +166,7 @@ ligththouse_protocal_t lighthouse_ptc = {.current_gpio = 0,
 // BLE TX tuning code.
 static tuning_code_t g_ble_tx_tuning_code = {
     .coarse = 19,
-    .mid = 2,
+    .mid = 20,
     .fine = 0,
 };
 
@@ -472,9 +472,6 @@ void distinguish_xy(uint32_t light_duration) {
 // int tmp_count_skip = 0;
 // uint32_t tmp_sync_width = 0;
 
-// after get 10 sync lights, call this function to calibrate clocks
-// void perform_synclight_calibration(void) { sync_light_calibrate_isr(); }
-
 void decode_lighthouse(void) {
     // This is the main function of lighthouse protocol decoding
     // lighthouse code start
@@ -597,7 +594,8 @@ void decode_lighthouse(void) {
                                 lighthouse_ptc.t_0_start -
                                 sync_cal.servel_synclights_start;
                             gpio_8_toggle();  // debug,remove later
-                            perform_synclight_calibration();
+                            // perform_synclight_calibration();
+                            sync_light_calibrate_isr();
                             sync_cal.count_calibration += 1;
                         }
                         break;
@@ -737,8 +735,8 @@ uint8_t counter_ble_tx;
 
 static inline void state_sending(void) {
     printf("State: BLE transimitting.\n");
-    // disable synclight calibration
-    sync_cal.need_sync_calibration = 0;
+    // enable/disable synclight calibration
+    sync_cal.need_sync_calibration = 1;
     // now I use optical cal for debugging
     // gpio_ext8_state = OPTICAL_ISR;
     gpio_ext8_state = SYNC_LIGHT_ISR;
@@ -746,6 +744,67 @@ static inline void state_sending(void) {
     // set this value to control how many times to transmitting
     counter_ble_tx = 5;
 
+    // if (sync_cal_ble_init_enable == true) {
+    //     // initialize_mote();
+    //     config_ble_tx_mote();
+
+    //     // Initialize BLE TX.
+    //     printf("Initializing BLE TX.\n");
+    //     ble_init();
+    //     ble_init_tx();
+
+    //     // Configure the RF timer.
+    //     rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
+    //     rftimer_enable_interrupts();
+    //     rftimer_enable_interrupts_by_id(7);
+
+    //     analog_scan_chain_write();
+    //     analog_scan_chain_load();
+
+    //     crc_check();
+    //     // perform_calibration();
+    // }
+
+#if BLE_CALIBRATE_LC
+    // optical_vars.optical_cal_finished = false;
+    // optical_enableLCCalibration();
+
+    synclight_cal_enableLCCalibration();
+    // this executed in radio_txEnable(), from perform_calibration(), I open it
+    // here.but I believe this included in 0x78 since 0110 and 0111
+    // ANALOG_CFG_REG__10 = 0x68;
+    // Turn on LO, DIV, PA, and IF
+    // move it below
+    // ANALOG_CFG_REG__10 = 0x78;
+
+    // Turn off polyphase and disable mixer
+    ANALOG_CFG_REG__16 = 0x6;
+
+    // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
+    // optical_setLCTarget(250182);
+    synclight_cal_setLCTarget(250182);
+#endif
+    printf("Config lighthouse mode\r\n");
+    config_lighthouse_mote();
+    // Turn on LO, DIV, PA, and IF
+    ANALOG_CFG_REG__10 = 0x78;
+    analog_scan_chain_write();
+    analog_scan_chain_load();
+    // Do not use perfom_calibration() here, it has radio_rxEnable() function,
+    // which will affect accuracy.
+
+    //  Enable optical SFD interrupt for optical calibration
+    optical_enable();
+
+    printf("Start synclight calibrating\r\n");
+    ICER = 0xFFFF;
+    // Wait for optical cal to finish
+    // while (!optical_getCalibrationFinished());
+    while (!synclight_cal_getCalibrationFinished()) {
+        decode_lighthouse();
+    };
+
+    printf("Cal complete\r\n");
     if (sync_cal_ble_init_enable == true) {
         // initialize_mote();
         config_ble_tx_mote();
@@ -767,43 +826,11 @@ static inline void state_sending(void) {
         // perform_calibration();
     }
 
-#if BLE_CALIBRATE_LC
-    // optical_vars.optical_cal_finished = false;
-    // optical_enableLCCalibration();
-
-    synclight_cal_vars.optical_cal_finished = false;
-    synclight_cal_enableLCCalibration();
-
-    // Turn on LO, DIV, PA, and IF
-    ANALOG_CFG_REG__10 = 0x78;
-
-    // Turn off polyphase and disable mixer
-    ANALOG_CFG_REG__16 = 0x6;
-
-    // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
-    // optical_setLCTarget(250182);
-    synclight_cal_setLCTarget(250182);
-#endif
-    // Do not use perfom_calibration() here, it has radio_rxEnable() function,
-    // which will affect accuracy.
-
-    //  Enable optical SFD interrupt for optical calibration
-    optical_enable();
-
-    // Wait for optical cal to finish
-    // while (!optical_getCalibrationFinished());
-    while (!synclight_cal_getCalibrationFinished());
-
-    printf("Cal complete\r\n");
-
     // Disable static divider to save power
     divProgram(480, 0, 0);
 
     // Configure coarse, mid, and fine codes for TX.
 #if BLE_CALIBRATE_LC
-    // g_ble_tx_tuning_code.coarse = optical_getLCCoarse();
-    // g_ble_tx_tuning_code.mid = optical_getLCMid();
-    // g_ble_tx_tuning_code.fine = optical_getLCFine();
 
     g_ble_tx_tuning_code.coarse = synclight_cal_getLCCoarse();
     g_ble_tx_tuning_code.mid = synclight_cal_getLCMid();

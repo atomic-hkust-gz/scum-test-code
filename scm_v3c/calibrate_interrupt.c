@@ -119,15 +119,14 @@ void perform_synclight_calibration(void) {
     // radio_rxEnable();
 
     // Enable optical SFD interrupt for optical calibration:ISER = 0x1800
-    optical_enable();
+    // optical_enable();
 
     // Wait for optical cal to finish
-    while (synclight_cal_getCalibrationFinished() == 0);
+    // while (synclight_cal_getCalibrationFinished() == 0);
 
     // Disable the radio now that it is calibrated
     // radio_rfOff();
 
-    printf("Calibration complete\r\n");
     sync_light_calibrate_isr();
 }
 
