@@ -595,6 +595,7 @@ void decode_lighthouse(void) {
                                 sync_cal.servel_synclights_start;
                             gpio_8_toggle();  // debug,remove later
                             // perform_synclight_calibration();
+                            printf("sync_cal_lc_in.\r\n");
                             sync_light_calibrate_isr();
                             sync_cal.count_calibration += 1;
                         }
@@ -800,6 +801,10 @@ static inline void state_sending(void) {
     ICER = 0xFFFF;
     // Wait for optical cal to finish
     // while (!optical_getCalibrationFinished());
+    synclight_cal_vars.optical_LC_cal_enable = true;
+    printf("LC_CAL_ON GOING. enbable:%u,fininshed:%u \r\n",
+           synclight_cal_vars.optical_LC_cal_enable,
+           synclight_cal_vars.optical_LC_cal_finished);
     while (!synclight_cal_getCalibrationFinished()) {
         decode_lighthouse();
     };
