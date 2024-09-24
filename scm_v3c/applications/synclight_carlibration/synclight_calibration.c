@@ -802,6 +802,7 @@ static inline void state_sending(void) {
     // Wait for optical cal to finish
     // while (!optical_getCalibrationFinished());
     synclight_cal_vars.optical_LC_cal_enable = true;
+    synclight_cal_vars.optical_LC_cal_finished = false;
     printf("LC_CAL_ON GOING. enbable:%u,fininshed:%u \r\n",
            synclight_cal_vars.optical_LC_cal_enable,
            synclight_cal_vars.optical_LC_cal_finished);

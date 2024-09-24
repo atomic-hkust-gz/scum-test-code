@@ -146,8 +146,9 @@ void sync_light_calibrate_isr(void) {
 
     //    int32_t t;
     uint32_t rdata_lsb, rdata_msb;
+    // int32_t count_LC;
     uint32_t count_LC, count_32k, count_2M, count_HFclock, count_IF;
-
+    uint32_t diff;
     uint32_t HF_CLOCK_fine;
     uint32_t HF_CLOCK_coarse;
     uint32_t RC2M_coarse;
@@ -232,11 +233,20 @@ void sync_light_calibrate_isr(void) {
         scm3c_hw_interface_set_HF_CLOCK_fine(HF_CLOCK_fine);
 
         // Do correction on LC
+        diff = (count_LC > synclight_cal_vars.LC_target)
+                   ? (count_LC - synclight_cal_vars.LC_target)
+                   : (synclight_cal_vars.LC_target - count_LC);
+        printf("condition in %u, %u, diff:\r\n",
+               synclight_cal_vars.optical_LC_cal_enable,
+               synclight_cal_vars.optical_LC_cal_finished, diff);
         if (synclight_cal_vars.optical_LC_cal_enable &&
-            !synclight_cal_vars.optical_LC_cal_finished) {
+            (!synclight_cal_vars.optical_LC_cal_finished)) {
+            // printf("condition in %u,
+            // %u",nclight_cal_vars.optical_LC_cal_enable,synclight_cal_vars.optical_LC_cal_finished);
             if ((count_LC <= synclight_cal_vars.LC_target) &&
                 (synclight_cal_vars.LC_target - count_LC <
                  synclight_cal_vars.cal_LC_diff)) {
+                printf("condition 1\r\n");
                 synclight_cal_vars.cal_LC_diff =
                     synclight_cal_vars.LC_target - count_LC;
                 synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
@@ -245,6 +255,7 @@ void sync_light_calibrate_isr(void) {
             } else if ((count_LC > synclight_cal_vars.LC_target) &&
                        (count_LC - synclight_cal_vars.LC_target <
                         synclight_cal_vars.cal_LC_diff)) {
+                printf("condition 2\r\n");
                 synclight_cal_vars.cal_LC_diff =
                     count_LC - synclight_cal_vars.LC_target;
                 synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
