@@ -728,7 +728,16 @@ static inline void state_optical_working(void) {
     // app_vars.count += 1;
 }
 
-static inline void state_calibrating(void) {}
+static inline void synclight_cal_enable_LC_calibration(void) {
+    synclight_cal_vars.cal_LC_coarse = LC_CAL_COARSE_MIN;
+    synclight_cal_vars.cal_LC_mid = LC_CAL_MID_MIN;
+    synclight_cal_vars.cal_LC_fine = LC_CAL_FINE_MIN;
+    synclight_cal_vars.optical_LC_cal_enable = true;
+    synclight_cal_vars.optical_LC_cal_finished = false;
+    LC_FREQCHANGE(synclight_cal_vars.cal_LC_coarse,
+                  synclight_cal_vars.cal_LC_mid,
+                  synclight_cal_vars.cal_LC_fine);
+}
 // I guess it does not need init each sending state
 bool sync_cal_ble_init_enable = true;
 // how many times to transmite ble packets in single SENDING state
@@ -770,6 +779,7 @@ static inline void state_sending(void) {
     // optical_vars.optical_cal_finished = false;
     // optical_enableLCCalibration();
 
+    // does not worked,why?
     synclight_cal_enableLCCalibration();
     // this executed in radio_txEnable(), from perform_calibration(), I open it
     // here.but I believe this included in 0x78 since 0110 and 0111
@@ -801,8 +811,10 @@ static inline void state_sending(void) {
     ICER = 0xFFFF;
     // Wait for optical cal to finish
     // while (!optical_getCalibrationFinished());
-    synclight_cal_vars.optical_LC_cal_enable = true;
-    synclight_cal_vars.optical_LC_cal_finished = false;
+    
+    // use inline function, this time should work.
+    synclight_cal_enable_LC_calibration();
+
     printf("LC_CAL_ON GOING. enbable:%u,fininshed:%u \r\n",
            synclight_cal_vars.optical_LC_cal_enable,
            synclight_cal_vars.optical_LC_cal_finished);

@@ -8,7 +8,13 @@
 #include "scm3c_hw_interface.h"
 
 //=========================== defines =========================================
-
+#define LC_CAL_COARSE_MIN 19
+#define LC_CAL_COARSE_MAX 25
+#define LC_CAL_MID_MIN 0
+#define LC_CAL_MID_MAX 31
+#define LC_CAL_FINE_MIN 15
+#define LC_CAL_FINE_MAX 15
+#define MIN_LC_DIFF 100
 //=========================== variables =======================================
 typedef struct {
     uint8_t optical_cal_iteration;
