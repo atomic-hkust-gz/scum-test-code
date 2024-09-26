@@ -28,7 +28,7 @@ typedef struct {
     uint32_t num_HFclock_ticks_in_100ms;
 
     // reference to calibrate
-    uint32_t LC_target;
+    int32_t LC_target;
     uint32_t LC_code;
     uint8_t LC_coarse;
     uint8_t LC_mid;

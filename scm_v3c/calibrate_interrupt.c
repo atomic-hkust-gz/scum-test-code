@@ -146,9 +146,11 @@ void sync_light_calibrate_isr(void) {
 
     //    int32_t t;
     uint32_t rdata_lsb, rdata_msb;
-    // int32_t count_LC;
-    uint32_t count_LC, count_32k, count_2M, count_HFclock, count_IF;
-    uint32_t diff;
+    int32_t count_LC;
+    uint32_t count_32k, count_2M, count_HFclock, count_IF;
+    // a new LC_diff to replace the struct variable one
+    // (synclight_cal_vars.cal_LC_diff).
+    int32_t real_LC_diff;
     uint32_t HF_CLOCK_fine;
     uint32_t HF_CLOCK_coarse;
     uint32_t RC2M_coarse;
@@ -157,6 +159,8 @@ void sync_light_calibrate_isr(void) {
     //    uint32_t IF_clk_target;
     uint32_t IF_coarse;
     uint32_t IF_fine;
+
+    int32_t tmp_countLC, tmp_LC_target;
 
     HF_CLOCK_fine = scm3c_hw_interface_get_HF_CLOCK_fine();
     HF_CLOCK_coarse = scm3c_hw_interface_get_HF_CLOCK_coarse();
@@ -233,46 +237,56 @@ void sync_light_calibrate_isr(void) {
         scm3c_hw_interface_set_HF_CLOCK_fine(HF_CLOCK_fine);
 
         // Do correction on LC
-        diff = (count_LC > synclight_cal_vars.LC_target)
-                   ? (count_LC - synclight_cal_vars.LC_target)
-                   : (synclight_cal_vars.LC_target - count_LC);
-        printf("condition in %u, %u, diff:\r\n",
+        // debugging, why diff cannot be calculated?
+        tmp_countLC = count_LC;
+        tmp_LC_target = synclight_cal_vars.LC_target;
+        real_LC_diff = (tmp_countLC > tmp_LC_target)
+                           ? (tmp_countLC - tmp_LC_target)
+                           : (tmp_LC_target - tmp_countLC);
+        printf("condition in %u, %u, diff:%u\r\n",
                synclight_cal_vars.optical_LC_cal_enable,
-               synclight_cal_vars.optical_LC_cal_finished, diff);
+               synclight_cal_vars.optical_LC_cal_finished, real_LC_diff);
+
         if (synclight_cal_vars.optical_LC_cal_enable &&
             (!synclight_cal_vars.optical_LC_cal_finished)) {
             // printf("condition in %u,
             // %u",nclight_cal_vars.optical_LC_cal_enable,synclight_cal_vars.optical_LC_cal_finished);
-            if ((count_LC <= synclight_cal_vars.LC_target) &&
-                (synclight_cal_vars.LC_target - count_LC <
-                 synclight_cal_vars.cal_LC_diff)) {
-                printf("condition 1\r\n");
-                synclight_cal_vars.cal_LC_diff =
-                    synclight_cal_vars.LC_target - count_LC;
-                synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
-                synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
-                synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
-            } else if ((count_LC > synclight_cal_vars.LC_target) &&
-                       (count_LC - synclight_cal_vars.LC_target <
-                        synclight_cal_vars.cal_LC_diff)) {
-                printf("condition 2\r\n");
-                synclight_cal_vars.cal_LC_diff =
-                    count_LC - synclight_cal_vars.LC_target;
-                synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
-                synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
-                synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
-            }
+            // This if function just calculate the cal_LC_diff, then give
+            // coarse/mid/fine, since I am already get the real_LC_diff, I just
+            // give new parameters(coarse/mid/fine)
+            // if ((count_LC <= synclight_cal_vars.LC_target) &&
+            //     (synclight_cal_vars.LC_target - count_LC <
+            //      synclight_cal_vars.cal_LC_diff)) {
+            //     printf("condition 1\r\n");
+            //     synclight_cal_vars.cal_LC_diff =
+            //         synclight_cal_vars.LC_target - count_LC;
+            //     synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
+            //     synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
+            //     synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
+            // } else if ((count_LC > synclight_cal_vars.LC_target) &&
+            //            (count_LC - synclight_cal_vars.LC_target <
+            //             synclight_cal_vars.cal_LC_diff)) {
+            //     printf("condition 2\r\n");
+            //     synclight_cal_vars.cal_LC_diff =
+            //         count_LC - synclight_cal_vars.LC_target;
+            //     synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
+            //     synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
+            //     synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
+            // }
+            synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
+            synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
+            synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
 
             printf("count_LC: %u, LC_target: %u, LC_diff: %u\r\n", count_LC,
                    synclight_cal_vars.LC_target,
-                   synclight_cal_vars.cal_LC_diff);
+                   real_LC_diff);
             printf("coarse: %u, mid: %u, fine: %u\n",
                    synclight_cal_vars.LC_coarse, synclight_cal_vars.LC_mid,
                    synclight_cal_vars.LC_fine);
             // why the stop codition is not related to LC_diff? I find
             // that the mid is correct enought when LC_diff is smaller
             // than 100.
-            if (synclight_cal_vars.cal_LC_diff < MIN_LC_DIFF) {
+            if (real_LC_diff < MIN_LC_DIFF) {
                 synclight_cal_vars.optical_LC_cal_finished = true;
             } else {
                 ++synclight_cal_vars.cal_LC_fine;
@@ -286,7 +300,7 @@ void sync_light_calibrate_isr(void) {
                         // LC_diff?
                         if ((synclight_cal_vars.cal_LC_coarse >
                              LC_CAL_COARSE_MAX) ||
-                            (synclight_cal_vars.cal_LC_diff < 100)) {
+                            (real_LC_diff < 100)) {
                             synclight_cal_vars.optical_LC_cal_finished = true;
                             printf("coarse: %u, mid: %u, fine: %u\n",
                                    synclight_cal_vars.LC_coarse,
