@@ -587,7 +587,7 @@ void decode_lighthouse(void) {
                         }
                         // when the count turn to 10, it is a sync calibration
                         // period.
-                        if ((sync_cal.count_sync_light == 10) &&
+                        if ((sync_cal.count_sync_light == 8) &&
                             (sync_cal.need_sync_calibration == 1)) {
                             sync_cal.count_sync_light = 0;
                             sync_cal.servel_synclights_duration =
@@ -595,7 +595,8 @@ void decode_lighthouse(void) {
                                 sync_cal.servel_synclights_start;
                             gpio_8_toggle();  // debug,remove later
                             // perform_synclight_calibration();
-                            printf("sync_cal_lc_in.\r\n");
+
+                            // printf("sync_cal_lc_in.\r\n");
                             sync_light_calibrate_isr();
                             sync_cal.count_calibration += 1;
                         }
@@ -811,7 +812,7 @@ static inline void state_sending(void) {
     ICER = 0xFFFF;
     // Wait for optical cal to finish
     // while (!optical_getCalibrationFinished());
-    
+
     // use inline function, this time should work.
     synclight_cal_enable_LC_calibration();
 

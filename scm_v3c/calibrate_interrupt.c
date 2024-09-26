@@ -11,13 +11,13 @@
 
 //=========================== defines =========================================
 
-//#define LC_CAL_COARSE_MIN 19
-//#define LC_CAL_COARSE_MAX 25
-//#define LC_CAL_MID_MIN 0
-//#define LC_CAL_MID_MAX 31
-//#define LC_CAL_FINE_MIN 15
-//#define LC_CAL_FINE_MAX 15
-//#define MIN_LC_DIFF 100
+// #define LC_CAL_COARSE_MIN 19
+// #define LC_CAL_COARSE_MAX 25
+// #define LC_CAL_MID_MIN 0
+// #define LC_CAL_MID_MAX 31
+// #define LC_CAL_FINE_MIN 15
+// #define LC_CAL_FINE_MAX 15
+// #define MIN_LC_DIFF 100
 
 //=========================== variables =======================================
 
@@ -243,9 +243,11 @@ void sync_light_calibrate_isr(void) {
         real_LC_diff = (tmp_countLC > tmp_LC_target)
                            ? (tmp_countLC - tmp_LC_target)
                            : (tmp_LC_target - tmp_countLC);
-        printf("condition in %u, %u, diff:%u\r\n",
-               synclight_cal_vars.optical_LC_cal_enable,
-               synclight_cal_vars.optical_LC_cal_finished, real_LC_diff);
+
+        //    disable it to reduce time cost
+        // printf("condition in %u, %u, diff:%u\r\n",
+        //        synclight_cal_vars.optical_LC_cal_enable,
+        //        synclight_cal_vars.optical_LC_cal_finished, real_LC_diff);
 
         if (synclight_cal_vars.optical_LC_cal_enable &&
             (!synclight_cal_vars.optical_LC_cal_finished)) {
@@ -260,26 +262,30 @@ void sync_light_calibrate_isr(void) {
             //     printf("condition 1\r\n");
             //     synclight_cal_vars.cal_LC_diff =
             //         synclight_cal_vars.LC_target - count_LC;
-            //     synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
-            //     synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
-            //     synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
+            //     synclight_cal_vars.LC_coarse =
+            //     synclight_cal_vars.cal_LC_coarse; synclight_cal_vars.LC_mid =
+            //     synclight_cal_vars.cal_LC_mid; synclight_cal_vars.LC_fine =
+            //     synclight_cal_vars.cal_LC_fine;
             // } else if ((count_LC > synclight_cal_vars.LC_target) &&
             //            (count_LC - synclight_cal_vars.LC_target <
             //             synclight_cal_vars.cal_LC_diff)) {
             //     printf("condition 2\r\n");
             //     synclight_cal_vars.cal_LC_diff =
             //         count_LC - synclight_cal_vars.LC_target;
-            //     synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
-            //     synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
-            //     synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
+            //     synclight_cal_vars.LC_coarse =
+            //     synclight_cal_vars.cal_LC_coarse; synclight_cal_vars.LC_mid =
+            //     synclight_cal_vars.cal_LC_mid; synclight_cal_vars.LC_fine =
+            //     synclight_cal_vars.cal_LC_fine;
             // }
             synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
             synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
             synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
 
             printf("count_LC: %u, LC_target: %u, LC_diff: %u\r\n", count_LC,
-                   synclight_cal_vars.LC_target,
-                   real_LC_diff);
+                   synclight_cal_vars.LC_target, real_LC_diff);
+
+            // By moving this print, time cost 133-125ms, but I need this
+            // info...so reduce synclight count to 7
             printf("coarse: %u, mid: %u, fine: %u\n",
                    synclight_cal_vars.LC_coarse, synclight_cal_vars.LC_mid,
                    synclight_cal_vars.LC_fine);
