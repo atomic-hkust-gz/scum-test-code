@@ -423,4 +423,94 @@ void sync_light_calibrate_isr(void) {
         ANALOG_CFG_REG__0 = 0x0000;
     }
 }
+// this function use to test call calibration frenquency, so just some print.
+// use this in decode_lighthouse #600
+void sync_light_calibrate_isr_placeholder(void) {
+    //    int32_t t;
+    uint32_t rdata_lsb, rdata_msb;
+    int32_t count_LC;
+    uint32_t count_32k, count_2M, count_HFclock, count_IF;
+    // a new LC_diff to replace the struct variable one
+    // (synclight_cal_vars.cal_LC_diff).
+    int32_t real_LC_diff;
+    uint32_t HF_CLOCK_fine;
+    uint32_t HF_CLOCK_coarse;
+    uint32_t RC2M_coarse;
+    uint32_t RC2M_fine;
+    uint32_t RC2M_superfine;
+    //    uint32_t IF_clk_target;
+    uint32_t IF_coarse;
+    uint32_t IF_fine;
+
+    int32_t tmp_countLC, tmp_LC_target;
+
+    HF_CLOCK_fine = scm3c_hw_interface_get_HF_CLOCK_fine();
+    HF_CLOCK_coarse = scm3c_hw_interface_get_HF_CLOCK_coarse();
+    RC2M_coarse = scm3c_hw_interface_get_RC2M_coarse();
+    RC2M_fine = scm3c_hw_interface_get_RC2M_fine();
+    RC2M_superfine = scm3c_hw_interface_get_RC2M_superfine();
+    //    IF_clk_target = scm3c_hw_interface_get_IF_clk_target();
+    IF_coarse = scm3c_hw_interface_get_IF_coarse();
+    IF_fine = scm3c_hw_interface_get_IF_fine();
+
+    // Disable all counters
+    ANALOG_CFG_REG__0 = 0x007F;
+
+    // Keep track of how many calibration iterations have been completed
+    synclight_cal_vars.optical_cal_iteration++;
+
+    // Read 32k counter
+    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
+    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
+    count_32k = rdata_lsb + (rdata_msb << 16);
+
+    // Read HF_CLOCK counter
+    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
+    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
+    count_HFclock = rdata_lsb + (rdata_msb << 16);
+
+    // Read 2M counter
+    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
+    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
+    count_2M = rdata_lsb + (rdata_msb << 16);
+
+    // Read LC_div counter (via counter4)
+    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
+    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
+    count_LC = rdata_lsb + (rdata_msb << 16);
+
+    // Read IF ADC_CLK counter
+    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x300000);
+    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x340000);
+    count_IF = rdata_lsb + (rdata_msb << 16);
+
+    // Reset all counters
+    ANALOG_CFG_REG__0 = 0x0000;
+
+    // Enable all counters
+    ANALOG_CFG_REG__0 = 0x3FFF;
+    synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
+    synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
+    synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
+
+    printf("count_LC: %u, LC_target: %u, LC_diff: %u\r\n", count_LC,
+           synclight_cal_vars.LC_target, real_LC_diff);
+
+    // By moving this print, time cost 133-125ms, but I need this
+    // info...so reduce synclight count to 7
+    printf("coarse: %u, mid: %u, fine: %u\n", synclight_cal_vars.LC_coarse,
+           synclight_cal_vars.LC_mid, synclight_cal_vars.LC_fine);
+    // why the stop codition is not related to LC_diff? I find
+    // that the mid is correct enought when LC_diff is smaller
+    // than 100.
+
+    printf("coarse: %u, mid: %u, fine: %u\n", synclight_cal_vars.LC_coarse,
+           synclight_cal_vars.LC_mid, synclight_cal_vars.LC_fine);
+
+    printf("HF=%d-%d   2M=%d-%d", count_HFclock, HF_CLOCK_fine, count_2M,
+           RC2M_coarse);
+    printf(",%d,%d   LC=%d-%d   ", RC2M_fine, RC2M_superfine, count_LC,
+           synclight_cal_vars.LC_code);
+    printf("IF=%d-%d\r\n", count_IF, IF_fine);
+}
 //=========================== private =========================================

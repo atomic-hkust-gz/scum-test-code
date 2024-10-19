@@ -8,13 +8,13 @@
 #include "scm3c_hw_interface.h"
 
 //=========================== defines =========================================
-#define LC_CAL_COARSE_MIN 19
+#define LC_CAL_COARSE_MIN 18
 #define LC_CAL_COARSE_MAX 25
 #define LC_CAL_MID_MIN 0
 #define LC_CAL_MID_MAX 31
 #define LC_CAL_FINE_MIN 15
 #define LC_CAL_FINE_MAX 15
-#define MIN_LC_DIFF 100
+#define MIN_LC_DIFF 2500
 //=========================== variables =======================================
 typedef struct {
     uint8_t optical_cal_iteration;
@@ -65,6 +65,7 @@ void gpio_ext_10_interrupt_enable(void);
 void gpio_ext_10_interrupt_disable(void);
 void sync_light_calibrate_init(void);
 void sync_light_calibrate_isr(void);
+void sync_light_calibrate_isr_placeholder(void);
 
 //=========================== private =========================================
 

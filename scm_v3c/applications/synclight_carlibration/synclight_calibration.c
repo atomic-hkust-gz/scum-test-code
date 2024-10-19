@@ -597,7 +597,8 @@ void decode_lighthouse(void) {
                             // perform_synclight_calibration();
 
                             // printf("sync_cal_lc_in.\r\n");
-                            sync_light_calibrate_isr();
+                            // sync_light_calibrate_isr();
+                            sync_light_calibrate_isr_placeholder();
                             sync_cal.count_calibration += 1;
                         }
                         break;
