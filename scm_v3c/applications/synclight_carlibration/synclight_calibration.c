@@ -660,16 +660,17 @@ void decode_lighthouse(void) {
 }
 
 static void update_state(enum State current_state) {
-    if (current_state == DEFAULT) {
-        scum_state = SENDING;
-    }
+    // if (current_state == DEFAULT) {
+    //     scum_state = SENDING;
+    // }
+    scum_state = COLLECTING;
 }
 
 // a counter to record how many lighthouse decoding process passed.
 // uint8_t sync_cal_counter_localization;
 // uint8_t sync_cal_lighthouse_state_period = 20000;
 
-static inline void state_optical_working(void) {
+static inline void state_optical_collecting(void) {
     printf("State: Locating SCUM.\n");
     // in this state, we only need location information, so disable
     // calibration part.
@@ -682,21 +683,32 @@ static inline void state_optical_working(void) {
     // close to 2s for changing  state between localization and
     // calibration
     sync_cal.counter_localization = sync_cal.counter_lighthouse_state_period;
+    // printf counter
+    sync_cal.counter_global_timer = 0;
 
     while (sync_cal.counter_localization) {
         decode_lighthouse();
+        // same function as 2d_stable branch
+        sync_cal.counter_global_timer++;
+        if (sync_cal.counter_global_timer == 10000) {
+            sync_cal.counter_global_timer = 0;
+            gpio_8_toggle();
+            // sync_light_calibrate_isr();
+            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", lighthouse_ptc.A_X,
+                   lighthouse_ptc.A_Y, lighthouse_ptc.B_X, lighthouse_ptc.B_Y);
+        }
         sync_cal.counter_localization--;
         // when comes to the period transfer statement, we use a
         // counter to change state
         if (sync_cal.counter_localization == 0) {
             switch (sync_cal.need_sync_calibration) {
                 case 0:
-                    sync_cal.need_sync_calibration = 1;
+                    // sync_cal.need_sync_calibration = 1;
                     sync_cal.counter_localization =
                         sync_cal.counter_lighthouse_state_period + 30000;
                     break;
                 case 1:
-                    sync_cal.need_sync_calibration = 0;
+                    // sync_cal.need_sync_calibration = 0;
                     sync_cal.counter_localization =
                         sync_cal.counter_lighthouse_state_period;
                     break;
@@ -722,8 +734,7 @@ static inline void state_optical_working(void) {
 
         // printf("hfclk: %u\n", hf_count_HFclock);
 
-        // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y,
-        // B_X, B_Y);
+        // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", A_X, A_Y, B_X, B_Y);
     }
 
     //        printf("Hello World! %d\n", app_vars.count);
@@ -882,20 +893,24 @@ int main(void) {
 
     printf("Initializing...");
 
-    // initialize_mote();
-    config_ble_tx_mote();
+    initialize_mote();
+    // config_ble_tx_mote();
 
     crc_check();
-    // perform_calibration();
+    perform_calibration();
     printf("~~~~my code start~~~~~%d\n", app_vars.count);
 
     // config_lighthouse_mote();
-    radio_rxEnable();  // openLC,IF?
+
+    // the scum tx and rx are different hardware, why need open this? I forgot.
+    // we only need tx part.
+    // radio_rxEnable();  // openLC,IF?
 
     // clean optical and ex3 interrupt, then re-open ext_3 interrupt
     gpio_ext8_state = SYNC_LIGHT_ISR;
     // enbale perform calibration in decode_lighthouse() by set to 1
     sync_cal.need_sync_calibration = 0;
+    printf("sync_cal.need_sync_calibration:%d\n ", sync_cal.need_sync_calibration);
 
     // disable all interrupts
     ICER = 0xFFFF;
@@ -914,8 +929,8 @@ int main(void) {
     while (1) {
         update_state(scum_state);
         switch (scum_state) {
-            case OPTICAL_WORKING:
-                state_optical_working();
+            case COLLECTING:
+                state_optical_collecting();
                 break;
 
             case CALIBRATING:
