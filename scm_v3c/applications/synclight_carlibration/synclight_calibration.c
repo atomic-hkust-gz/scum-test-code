@@ -55,7 +55,9 @@ enum State {
     // receive light and calculate localization, sub state of OPTICAL_WORKING
     COLLECTING,
     // use sync light to calibrate clock, sub state of OPTICAL_WORKING
-    CALIBRATING,
+    OPTICAL_CALIBRATING,
+    // use perform calibration to calibrate clock
+    RAW_CALIBRATING,
     // generate BLE packet which carried location information
     INTEGRATING,
     // transmate BLE packet
@@ -910,7 +912,8 @@ int main(void) {
     gpio_ext8_state = SYNC_LIGHT_ISR;
     // enbale perform calibration in decode_lighthouse() by set to 1
     sync_cal.need_sync_calibration = 0;
-    printf("sync_cal.need_sync_calibration:%d\n ", sync_cal.need_sync_calibration);
+    printf("sync_cal.need_sync_calibration:%d\n ",
+           sync_cal.need_sync_calibration);
 
     // disable all interrupts
     ICER = 0xFFFF;
@@ -930,26 +933,39 @@ int main(void) {
         update_state(scum_state);
         switch (scum_state) {
             case COLLECTING:
+                printf("State: Lighthouse Locating.\n");
+                // disable synclight calibration
+                sync_cal.need_sync_calibration = 0;
                 state_optical_collecting();
                 break;
 
-            case CALIBRATING:
-                printf("State: Calibrating.\n");
+            case OPTICAL_CALIBRATING:
+                printf("State: OPTICAL Calibrating.\n");
                 // to get sync light for calibration must need decode
                 // lighthouse, but can we make this function to two separate
                 // parts? Is that essential?
                 sync_cal.need_sync_calibration = 1;
                 decode_lighthouse();
                 break;
+
+            case RAW_CALIBRATING:
+                printf("State: Raw Calibrating.\n");
+                // Of course there will be some time I want to use old calibration,
+                // not sync light calibration
+                perform_calibration();
+                break;
+
             case INTEGRATING:
                 printf("State: Integrating ble packet.\n");
                 // a small gap used to generate the ble packet. for this
                 // fuction, I think it does not need to be an individual state,
                 // but in this way will be clearly
                 sync_cal.need_sync_calibration = 0;
+                ble_init();
                 ble_generate_location_packet();
                 break;
             case SENDING:
+                printf("State: BLE transimitting.\n");
                 state_sending();
                 break;
             case DEFAULT:
