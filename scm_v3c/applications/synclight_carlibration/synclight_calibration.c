@@ -753,6 +753,25 @@ static inline void synclight_cal_enable_LC_calibration(void) {
                   synclight_cal_vars.cal_LC_mid,
                   synclight_cal_vars.cal_LC_fine);
 }
+
+static inline void state_opt_calibrating(void) {
+    // now I use optical cal for debugging
+    // gpio_ext8_state = OPTICAL_ISR;
+    gpio_ext8_state = SYNC_LIGHT_ISR;
+    // optical_enableLCCalibration();
+
+    // does not worked,why?
+    synclight_cal_enableLCCalibration();
+    // Turn off polyphase and disable mixer
+    ANALOG_CFG_REG__16 = 0x6;
+
+    // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
+    // optical_setLCTarget(250182);
+    synclight_cal_setLCTarget(250182);
+    config_lighthouse_mote();
+    decode_lighthouse();
+}
+
 // I guess it does not need init each sending state
 bool sync_cal_ble_init_enable = true;
 // how many times to transmite ble packets in single SENDING state
@@ -767,7 +786,7 @@ static inline void state_sending(void) {
     gpio_ext8_state = SYNC_LIGHT_ISR;
 
     // set this value to control how many times to transmitting
-    counter_ble_tx = 5;
+    counter_ble_tx = 10;
 
     // if (sync_cal_ble_init_enable == true) {
     //     // initialize_mote();
@@ -945,13 +964,14 @@ int main(void) {
                 // lighthouse, but can we make this function to two separate
                 // parts? Is that essential?
                 sync_cal.need_sync_calibration = 1;
-                decode_lighthouse();
+                state_opt_calibrating();
+
                 break;
 
             case RAW_CALIBRATING:
                 printf("State: Raw Calibrating.\n");
-                // Of course there will be some time I want to use old calibration,
-                // not sync light calibration
+                // Of course there will be some time I want to use old
+                // calibration, not sync light calibration
                 perform_calibration();
                 break;
 
