@@ -154,6 +154,26 @@ ligththouse_protocal_t lighthouse_ptc = {.current_gpio = 0,
                                          .B_X = 0,
                                          .B_Y = 0};
 
+// LC calibration need read LC Div Counter at the start of a sync light
+// first the register value will be record in rdata_lsb/msb, but we will only
+// know the light is a sync light after the light ends. Thus, we will have valid
+// values only if current light is a sync light while number=expect number.
+typedef struct {
+    uint32_t rdata_lsb, rdata_msb, valid_rdata_lsb, valid_rdata_msb;
+    uint32_t count_LC;
+    uint32_t first_sync_LC_start;
+    uint32_t last_sync_LC_start;
+} sync_light_cal_Registers_t;
+
+sync_light_cal_Registers_t sync_cal_registers = {
+    .rdata_lsb = 0,
+    .rdata_msb = 0,
+    .valid_rdata_lsb = 0,
+    .valid_rdata_msb = 0,
+    .count_LC = 0,
+    .first_sync_LC_start = 0,
+    .last_sync_LC_start = 0,
+};
 // ble variables from ble_tx_ti.c
 /************************************************************************ */
 // If true, sweep through all fine codes.
@@ -486,6 +506,14 @@ void decode_lighthouse(void) {
 
         // Save when this event happened
         lighthouse_ptc.timestamp_rise = RFTIMER_REG__COUNTER;
+        // Read LC_div counter (via counter4),this is the accurate moment of a
+        // light start.
+        sync_cal_registers.rdata_lsb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
+        sync_cal_registers.rdata_msb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
+        sync_cal_registers.count_LC =
+            sync_cal_registers.rdata_lsb + (sync_cal_registers.rdata_msb << 16);
         //      only for debugging
         gpio_10_toggle();
         switch (lighthouse_ptc.flag_start) {
@@ -586,6 +614,9 @@ void decode_lighthouse(void) {
                         if (sync_cal.count_sync_light == 1) {
                             sync_cal.servel_synclights_start =
                                 lighthouse_ptc.t_0_start;
+                            // also need record first synclight LC counter value
+                            sync_cal_registers.first_sync_LC_start =
+                                sync_cal_registers.count_LC;
                         }
                         // when the count turn to 10, it is a sync calibration
                         // period.
@@ -595,11 +626,21 @@ void decode_lighthouse(void) {
                             sync_cal.servel_synclights_duration =
                                 lighthouse_ptc.t_0_start -
                                 sync_cal.servel_synclights_start;
+                            // also, the last time LC counter need be recorded
+                            sync_cal_registers.last_sync_LC_start =
+                                sync_cal_registers.count_LC;
                             gpio_8_toggle();  // debug,remove later
+
                             // perform_synclight_calibration();
 
                             // printf("sync_cal_lc_in.\r\n");
                             // sync_light_calibrate_isr();
+                            // here should give two parameters, maybe after
+                            // that, we do not need to artificially reduce the
+                            // number of counts
+                            sync_light_calibrate_isr_individual_LC(
+                                sync_cal_registers.first_sync_LC_start,
+                                sync_cal_registers.last_sync_LC_start);
                             sync_light_calibrate_isr_placeholder();
                             sync_cal.count_calibration += 1;
                         }

@@ -65,6 +65,7 @@ void gpio_ext_10_interrupt_enable(void);
 void gpio_ext_10_interrupt_disable(void);
 void sync_light_calibrate_init(void);
 void sync_light_calibrate_isr(void);
+void sync_light_calibrate_isr_individual_LC(uint32_t LC_start, uint32_t LC_end);
 void sync_light_calibrate_isr_placeholder(void);
 
 //=========================== private =========================================
