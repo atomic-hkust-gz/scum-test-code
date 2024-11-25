@@ -161,7 +161,7 @@ ligththouse_protocal_t lighthouse_ptc = {.current_gpio = 0,
 // values only if current light is a sync light while number=expect number.
 typedef struct {
     uint32_t rdata_lsb, rdata_msb;
-    uint32_t count_LC;
+    uint32_t count_LC, count_32k, count_2M, count_HFclock, count_IF;
     uint32_t first_sync_LC_start, last_sync_LC_start;
     // when we decide discard the LC value, set flag_reset_counter to 1, when we
     // want to save, set flag_save_counter_value to 1
@@ -172,6 +172,10 @@ sync_light_cal_Registers_t sync_cal_registers = {
     .rdata_lsb = 0,
     .rdata_msb = 0,
     .count_LC = 0,
+    .count_2M = 0,
+    .count_32k = 0,
+    .count_HFclock = 0,
+    .count_IF = 0,
     .first_sync_LC_start = 0,
     .last_sync_LC_start = 0,
     .flag_reset_counter = 0,
@@ -510,57 +514,85 @@ void decode_lighthouse(void) {
         // Save when this event happened
         lighthouse_ptc.timestamp_rise = RFTIMER_REG__COUNTER;
 
-        uint32_t rdata_lsb, rdata_msb;
-        uint32_t count_LC;
-        uint32_t first_sync_LC_start, last_sync_LC_start;
+        // uint32_t rdata_lsb, rdata_msb;
+        // uint32_t count_LC;
+        // uint32_t first_sync_LC_start, last_sync_LC_start;
 
-        uint32_t count_32k, count_2M, count_HFclock, count_IF;
-        // a new LC_diff to replace the struct variable one
-        // (synclight_cal_vars.cal_LC_diff).
-        int32_t real_LC_diff;
+        // uint32_t count_32k, count_2M, count_HFclock, count_IF;
+        // // a new LC_diff to replace the struct variable one
+        // // (synclight_cal_vars.cal_LC_diff).
+        // int32_t real_LC_diff;
 
-        int32_t tmp_countLC, tmp_LC_target;
+        // int32_t tmp_countLC, tmp_LC_target;
         // uint8_t flag_reset_counter, flag_save_counter_value;
 
         // read counters, but first we have to know whether reset the counters
         // to zero or not by flag_reset_counter
-        // if (sync_cal_registers.flag_reset_counter == 1) {
-        //     // Reset all counters
-        //     ANALOG_CFG_REG__0 = 0x0000;
-        //     // Enable all counters
-        //     ANALOG_CFG_REG__0 = 0x3FFF;
-        // } else {
-        //     // Enable all counters
-        //     ANALOG_CFG_REG__0 = 0x3FFF;
-        // }
+        if (sync_cal_registers.flag_reset_counter == 1) {
+            // Reset all counters
+            ANALOG_CFG_REG__0 = 0x0000;
+            // Enable all counters
+            ANALOG_CFG_REG__0 = 0x3FFF;
+        } else {
+            // Enable all counters
+            ANALOG_CFG_REG__0 = 0x3FFF;
+        }
         // Disable all counters
         // ANALOG_CFG_REG__0 = 0x007F;
+
         // Read LC_div counter (via counter4),this is the accurate moment of a
         // light start.
-        // sync_cal_registers.rdata_lsb =
-        //     *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
-        // sync_cal_registers.rdata_msb =
-        //     *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
-        // sync_cal_registers.count_LC =
-        //     sync_cal_registers.rdata_lsb + (sync_cal_registers.rdata_msb <<
-        //     16);
+        sync_cal_registers.rdata_lsb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
+        sync_cal_registers.rdata_msb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
+        sync_cal_registers.count_LC =
+            sync_cal_registers.rdata_lsb + (sync_cal_registers.rdata_msb << 16);
 
-        // printf("LC div: %u\n", sync_cal_registers.count_LC);
+        // Read HF_CLOCK counter
+        sync_cal_registers.rdata_lsb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
+        sync_cal_registers.rdata_msb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
+        sync_cal_registers.count_HFclock =
+            sync_cal_registers.rdata_lsb + (sync_cal_registers.rdata_msb << 16);
+
         // Read 2M counter
-        rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
-        rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
-        count_2M = rdata_lsb + (rdata_msb << 16);
-
-        rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
-        rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
-        count_LC = rdata_lsb + (rdata_msb << 16);
+        sync_cal_registers.rdata_lsb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
+        sync_cal_registers.rdata_msb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
+        sync_cal_registers.count_2M =
+            sync_cal_registers.rdata_lsb + (sync_cal_registers.rdata_msb << 16);
 
         // Read 32k counter
-        rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
-        rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
-        count_32k = rdata_lsb + (rdata_msb << 16);
+        sync_cal_registers.rdata_lsb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
+        sync_cal_registers.rdata_msb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
+        sync_cal_registers.count_32k =
+            sync_cal_registers.rdata_lsb + (sync_cal_registers.rdata_msb << 16);
 
-        printf("2m: %u, lc: %u, 32kL %u\r\n", count_2M, count_LC, count_32k);
+        // printf("LC div: %u\n", sync_cal_registers.count_LC);
+        printf("2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
+               sync_cal_registers.count_2M, sync_cal_registers.count_LC,
+               sync_cal_registers.count_32k, sync_cal_registers.count_HFclock);
+
+        // // Read 2M counter
+        // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
+        // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
+        // count_2M = rdata_lsb + (rdata_msb << 16);
+
+        // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
+        // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
+        // count_LC = rdata_lsb + (rdata_msb << 16);
+
+        // // Read 32k counter
+        // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
+        // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
+        // count_32k = rdata_lsb + (rdata_msb << 16);
+
+        // printf("2m: %u, lc: %u, 32k %u\r\n", count_2M, count_LC, count_32k);
         // Reset all counters
         ANALOG_CFG_REG__0 = 0x0000;
 
@@ -871,30 +903,16 @@ static inline void state_opt_calibrating(void) {
 
     // does not worked,why?
     synclight_cal_enableLCCalibration();
-    // Turn off polyphase and disable mixer
-    ANALOG_CFG_REG__16 = 0x6;
 
     // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
     // optical_setLCTarget(250182);
     synclight_cal_setLCTarget(250182);
     config_lighthouse_mote();
-    // Reset all counters
-    ANALOG_CFG_REG__0 = 0x0000;
-    // Enable all counters to get LC,2M ...counter
-    ANALOG_CFG_REG__0 = 0x3FFF;
 
-    // // these two codes try open LC
-    // // Turn on DIV if need read LC_count
-    // // ANALOG_CFG_REG__10 = 0x0068;
-    // ANALOG_CFG_REG__10 = 0x0058;
-    // // Turn off polyphase and disable mixer
-    // ANALOG_CFG_REG__16 = 0x6;
+    // this line only used for enable LC
     radio_txEnable();
     int8_t ticks = 1000;
-    unsigned int count_32k, count_2M, count_HFclock, count_LC;
     while (1) {
-        // read_counters(&count_2M, &count_LC, &count_32k);
-        // printf("2m: %u, lc: %u, 32kL %u\r\n", count_2M, count_LC, count_32k);
         while (ticks) {
             ticks--;
         };
