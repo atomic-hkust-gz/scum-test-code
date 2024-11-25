@@ -514,18 +514,6 @@ void decode_lighthouse(void) {
         // Save when this event happened
         lighthouse_ptc.timestamp_rise = RFTIMER_REG__COUNTER;
 
-        // uint32_t rdata_lsb, rdata_msb;
-        // uint32_t count_LC;
-        // uint32_t first_sync_LC_start, last_sync_LC_start;
-
-        // uint32_t count_32k, count_2M, count_HFclock, count_IF;
-        // // a new LC_diff to replace the struct variable one
-        // // (synclight_cal_vars.cal_LC_diff).
-        // int32_t real_LC_diff;
-
-        // int32_t tmp_countLC, tmp_LC_target;
-        // uint8_t flag_reset_counter, flag_save_counter_value;
-
         // read counters, but first we have to know whether reset the counters
         // to zero or not by flag_reset_counter
         if (sync_cal_registers.flag_reset_counter == 1) {
@@ -573,34 +561,21 @@ void decode_lighthouse(void) {
         sync_cal_registers.count_32k =
             sync_cal_registers.rdata_lsb + (sync_cal_registers.rdata_msb << 16);
 
+        // only for debugging,should toggle before uart send , uart latency is
+        // large
+        gpio_10_toggle();
         // printf("LC div: %u\n", sync_cal_registers.count_LC);
         printf("2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
                sync_cal_registers.count_2M, sync_cal_registers.count_LC,
                sync_cal_registers.count_32k, sync_cal_registers.count_HFclock);
-
-        // // Read 2M counter
-        // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
-        // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
-        // count_2M = rdata_lsb + (rdata_msb << 16);
-
-        // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
-        // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
-        // count_LC = rdata_lsb + (rdata_msb << 16);
-
-        // // Read 32k counter
-        // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
-        // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
-        // count_32k = rdata_lsb + (rdata_msb << 16);
-
-        // printf("2m: %u, lc: %u, 32k %u\r\n", count_2M, count_LC, count_32k);
+        // set the CFG_REG to config counters
         // Reset all counters
         ANALOG_CFG_REG__0 = 0x0000;
-
         // Enable all counters
         ANALOG_CFG_REG__0 = 0x3FFF;
 
-        //      only for debugging
-        gpio_10_toggle();
+        // //      only for debugging
+        // gpio_10_toggle();
         switch (lighthouse_ptc.flag_start) {
             case 0:
                 lighthouse_ptc.t_0_start = lighthouse_ptc.timestamp_rise;
