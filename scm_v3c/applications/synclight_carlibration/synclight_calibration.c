@@ -526,6 +526,7 @@ void decode_lighthouse(void) {
             ANALOG_CFG_REG__0 = 0x0000;
             // Enable all counters
             ANALOG_CFG_REG__0 = 0x3FFF;
+            gpio_8_toggle();  // debug,remove later
         } else {
             // Enable all counters
             ANALOG_CFG_REG__0 = 0x3FFF;
@@ -677,18 +678,19 @@ void decode_lighthouse(void) {
                         // after a sync, the count_sync_light will increase 1,
                         // so when the count_sync_light = 1, it means this is
                         // the first sync light. record start time.
-                        if (sync_cal.count_sync_light == 1) {
-                            sync_cal.several_synclights_start =
-                                lighthouse_ptc.t_0_start;
-                            // also need record first synclight LC counter value
-                            sync_cal_registers.first_sync_LC_start =
-                                sync_cal_registers.count_LC;
-                            // start record 10 sync, donot reset the counter
-                            sync_cal_registers.flag_reset_counter = 0;
-                        }
-                        // when the count turn to 10, it is a sync calibration
+                        // if (sync_cal.count_sync_light == 1) {
+                        //     sync_cal.several_synclights_start =
+                        //         lighthouse_ptc.t_0_start;
+                        //     // also need record first synclight LC counter value
+                        //     sync_cal_registers.first_sync_LC_start =
+                        //         sync_cal_registers.count_LC;
+                        //     // start record 10 sync, donot reset the counter
+                        //     sync_cal_registers.flag_reset_counter = 0;
+                        // }
+
+                        // when the count turn to 12, it is a sync calibration
                         // period.
-                        if ((sync_cal.count_sync_light == 10) &&
+                        if ((sync_cal.count_sync_light == 12) &&
                             (sync_cal.need_sync_calibration == 1)) {
                             // once the count_sync_light == 0,will reset clock
                             // counters in rising edge
@@ -699,7 +701,7 @@ void decode_lighthouse(void) {
                             // also, the last time LC counter need be recorded
                             sync_cal_registers.last_sync_LC_start =
                                 sync_cal_registers.count_LC;
-                            gpio_8_toggle();  // debug,remove later
+                            // gpio_8_toggle();  // debug,remove later
                             // // after save last LC value, we need reset the
                             // // counter to prepare next calibration process
                             // sync_cal_registers.flag_reset_counter = 1;
@@ -721,10 +723,12 @@ void decode_lighthouse(void) {
 
                             // print LC value to test if we get a right LC in 10
                             // synclight periods
-                            printf("LC div: %u\n", sync_cal_registers.count_LC);
-                            // printf("LC div start: %u, end: %u\n",
-                            //        sync_cal_registers.first_sync_LC_start,
-                            //        sync_cal_registers.last_sync_LC_start);
+                            // printf("LC div: %u\n", sync_cal_registers.count_LC);
+                            printf("2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
+                                   sync_cal_registers.count_2M,
+                                   sync_cal_registers.count_LC,
+                                   sync_cal_registers.count_32k,
+                                   sync_cal_registers.count_HFclock);
 
                             sync_cal.count_calibration += 1;
                         }
