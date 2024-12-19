@@ -68,9 +68,8 @@ enum State scum_state;
 typedef struct {
     // store synclight then call synclight calibration
     uint8_t count_sync_light;
-    // store synclight then call synclight calibration, similar to
-    // count_sync_light, this will replace the old one.
-    uint8_t clockSyncPulseCount;
+    // 添加一个标志位表示当前是否在有效的计数周期内
+    bool in_valid_counting_period;
     // whether enable the synclight calibration
     uint8_t need_sync_calibration;
     // record 10 synclight duration
@@ -89,7 +88,7 @@ typedef struct {
 } sync_light_calibration_t;
 
 sync_light_calibration_t sync_cal = {.count_sync_light = 0,
-                                     .clockSyncPulseCount = 0,
+                                     .in_valid_counting_period = false,
                                      .need_sync_calibration = 0,
                                      .several_synclights_start = 0,
                                      .several_synclights_duration = 0,
@@ -471,19 +470,19 @@ void distinguish_xy(uint32_t light_duration) {
     if (light_duration < 675 + WIDTH_BIAS &&
         light_duration > 500 + WIDTH_BIAS) {
         lighthouse_ptc.loca_x = 1;  // Azimuth sync, data=0, skip = 0
-        sync_cal.count_sync_light += 1;
+        // sync_cal.count_sync_light += 1;
     } else if (light_duration >= 675 + WIDTH_BIAS &&
                light_duration < 781 + WIDTH_BIAS) {
         lighthouse_ptc.loca_x = 0;  // Elevation sync, data=0, skip = 0
-        sync_cal.count_sync_light += 1;
+        // sync_cal.count_sync_light += 1;
     } else if (light_duration >= 781 + WIDTH_BIAS &&
                light_duration < 885 + WIDTH_BIAS) {
         lighthouse_ptc.loca_x = 1;  // Azimuth sync, data=1, skip = 0
-        sync_cal.count_sync_light += 1;
+        // sync_cal.count_sync_light += 1;
     } else if (light_duration >= 885 + WIDTH_BIAS &&
                light_duration < 989 + WIDTH_BIAS) {
         lighthouse_ptc.loca_x = 0;  // Elevation sync, data=1, skip = 0
-        sync_cal.count_sync_light += 1;
+        // sync_cal.count_sync_light += 1;
     } else if (light_duration >= 989 + WIDTH_BIAS &&
                light_duration < 1083 + WIDTH_BIAS)
         lighthouse_ptc.loca_x = 1;  // Azimuth sync, data=0, skip = 1
@@ -521,7 +520,8 @@ void decode_lighthouse(void) {
         // read counters, but first we have to know whether reset the counters
         // to zero or not by sync_cal_registers.flag_reset_counter.now we want
         // to use sync_cal.clockSyncPulseCount replaced
-        if (sync_cal.count_sync_light == 0) {
+        if (sync_cal.in_valid_counting_period &&
+            sync_cal.count_sync_light == 0) {
             // Reset all counters
             ANALOG_CFG_REG__0 = 0x0000;
             // Enable all counters
@@ -681,56 +681,73 @@ void decode_lighthouse(void) {
                         // if (sync_cal.count_sync_light == 1) {
                         //     sync_cal.several_synclights_start =
                         //         lighthouse_ptc.t_0_start;
-                        //     // also need record first synclight LC counter value
-                        //     sync_cal_registers.first_sync_LC_start =
+                        //     // also need record first synclight LC counter
+                        //     value sync_cal_registers.first_sync_LC_start =
                         //         sync_cal_registers.count_LC;
                         //     // start record 10 sync, donot reset the counter
                         //     sync_cal_registers.flag_reset_counter = 0;
                         // }
 
-                        // when the count turn to 12, it is a sync calibration
-                        // period.
-                        if ((sync_cal.count_sync_light == 12) &&
-                            (sync_cal.need_sync_calibration == 1)) {
-                            // once the count_sync_light == 0,will reset clock
-                            // counters in rising edge
-                            sync_cal.count_sync_light = 0;
-                            sync_cal.several_synclights_duration =
-                                lighthouse_ptc.t_0_start -
-                                sync_cal.several_synclights_start;
-                            // also, the last time LC counter need be recorded
-                            sync_cal_registers.last_sync_LC_start =
-                                sync_cal_registers.count_LC;
-                            // gpio_8_toggle();  // debug,remove later
-                            // // after save last LC value, we need reset the
-                            // // counter to prepare next calibration process
-                            // sync_cal_registers.flag_reset_counter = 1;
+                        // 如果不在有效计数周期内且检测到同步光，开始新的计数周期
+                        if (!sync_cal.in_valid_counting_period) {
+                            sync_cal.in_valid_counting_period = true;
+                            sync_cal.count_sync_light = 0;  // 确保从0开始计数
+                            // 下一个上升沿会重置计数器
+                        }
 
-                            // perform_synclight_calibration();
+                        if (sync_cal.in_valid_counting_period) {
+                            sync_cal.count_sync_light++;
 
-                            // printf("sync_cal_lc_in.\r\n");
-                            // sync_light_calibrate_isr();
+                            // when the count turn to 12, it is a sync
+                            // calibration period.
+                            if ((sync_cal.count_sync_light == 12) &&
+                                (sync_cal.need_sync_calibration == 1)) {
+                                // 结束当前计数周期
+                                sync_cal.in_valid_counting_period = true;
+                                // once the count_sync_light == 0,will reset
+                                // clock counters in rising edge
+                                sync_cal.count_sync_light = 0;
+                                sync_cal.several_synclights_duration =
+                                    lighthouse_ptc.t_0_start -
+                                    sync_cal.several_synclights_start;
+                                // also, the last time LC counter need be
+                                // recorded
+                                sync_cal_registers.last_sync_LC_start =
+                                    sync_cal_registers.count_LC;
+                                // gpio_8_toggle();  // debug,remove later
+                                // // after save last LC value, we need reset
+                                // the
+                                // // counter to prepare next calibration
+                                // process sync_cal_registers.flag_reset_counter
+                                // = 1;
 
-                            // here should give two parameters, maybe after
-                            // that, we do not need to artificially reduce the
-                            // number of counts
-                            // sync_light_calibrate_isr_individual_LC(
-                            //     sync_cal_registers.first_sync_LC_start,
-                            //     sync_cal_registers.last_sync_LC_start);
+                                // perform_synclight_calibration();
 
-                            // this is a null calibrate fuction to test isr
-                            // accuracy sync_light_calibrate_isr_placeholder();
+                                // printf("sync_cal_lc_in.\r\n");
+                                // sync_light_calibrate_isr();
 
-                            // print LC value to test if we get a right LC in 10
-                            // synclight periods
-                            // printf("LC div: %u\n", sync_cal_registers.count_LC);
-                            printf("2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
-                                   sync_cal_registers.count_2M,
-                                   sync_cal_registers.count_LC,
-                                   sync_cal_registers.count_32k,
-                                   sync_cal_registers.count_HFclock);
+                                // here should give two parameters, maybe after
+                                // that, we do not need to artificially reduce
+                                // the number of counts
+                                // sync_light_calibrate_isr_individual_LC(
+                                //     sync_cal_registers.first_sync_LC_start,
+                                //     sync_cal_registers.last_sync_LC_start);
 
-                            sync_cal.count_calibration += 1;
+                                // this is a null calibrate fuction to test isr
+                                // accuracy
+                                // sync_light_calibrate_isr_placeholder();
+
+                                // print LC value to test if we get a right LC
+                                // in 10 synclight periods printf("LC div:
+                                // %u\n", sync_cal_registers.count_LC);
+                                printf("2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
+                                       sync_cal_registers.count_2M,
+                                       sync_cal_registers.count_LC,
+                                       sync_cal_registers.count_32k,
+                                       sync_cal_registers.count_HFclock);
+
+                                sync_cal.count_calibration += 1;
+                            }
                         }
                         break;
                     case sweep_light:
