@@ -695,7 +695,7 @@ void decode_lighthouse(void) {
 
                             // when the count turn to 12, it is a sync
                             // calibration period.
-                            if ((sync_cal.count_sync_light == 12) &&
+                            if ((sync_cal.count_sync_light == 13) &&
                                 (sync_cal.need_sync_calibration == 1)) {
                                 // 结束当前计数周期
                                 sync_cal.in_valid_counting_period = false;
