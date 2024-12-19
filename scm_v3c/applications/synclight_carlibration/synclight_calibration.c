@@ -689,21 +689,16 @@ void decode_lighthouse(void) {
                         // }
 
                         // 如果不在有效计数周期内且检测到同步光，开始新的计数周期
-                        if (!sync_cal.in_valid_counting_period) {
-                            sync_cal.in_valid_counting_period = true;
-                            sync_cal.count_sync_light = 0;  // 确保从0开始计数
-                            // 下一个上升沿会重置计数器
-                        }
 
                         if (sync_cal.in_valid_counting_period) {
-                            sync_cal.count_sync_light++;
+                            sync_cal.count_sync_light += 1;
 
                             // when the count turn to 12, it is a sync
                             // calibration period.
                             if ((sync_cal.count_sync_light == 12) &&
                                 (sync_cal.need_sync_calibration == 1)) {
                                 // 结束当前计数周期
-                                sync_cal.in_valid_counting_period = true;
+                                sync_cal.in_valid_counting_period = false;
                                 // once the count_sync_light == 0,will reset
                                 // clock counters in rising edge
                                 sync_cal.count_sync_light = 0;
@@ -748,6 +743,10 @@ void decode_lighthouse(void) {
 
                                 sync_cal.count_calibration += 1;
                             }
+                        } else {
+                            sync_cal.in_valid_counting_period = true;
+                            sync_cal.count_sync_light = 0;  // 确保从0开始计数
+                            // 下一个上升沿会重置计数器
                         }
                         break;
                     case sweep_light:
