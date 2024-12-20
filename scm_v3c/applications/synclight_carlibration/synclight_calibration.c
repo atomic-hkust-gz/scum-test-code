@@ -915,11 +915,11 @@ static inline void state_opt_calibrating(void) {
 
     // this line only used for enable LC
     radio_txEnable();
-    int8_t ticks = 1000;
+    // int8_t ticks = 1000;
     while (1) {
-        while (ticks) {
-            ticks--;
-        };
+        // while (ticks) {
+        //     ticks--;
+        // };
         decode_lighthouse();
     }
 }
