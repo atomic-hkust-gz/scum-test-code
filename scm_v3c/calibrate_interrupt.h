@@ -14,7 +14,7 @@
 #define LC_CAL_MID_MAX 31
 #define LC_CAL_FINE_MIN 15
 #define LC_CAL_FINE_MAX 15
-#define MIN_LC_DIFF 2500
+#define MIN_LC_DIFF 100
 //=========================== variables =======================================
 typedef struct {
     uint8_t optical_cal_iteration;
@@ -65,7 +65,7 @@ void gpio_ext_10_interrupt_enable(void);
 void gpio_ext_10_interrupt_disable(void);
 void sync_light_calibrate_init(void);
 void sync_light_calibrate_isr(void);
-void sync_light_calibrate_isr_individual_LC(uint32_t LC_start, uint32_t LC_end);
+void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M, uint32_t count_IF, uint32_t count_LC);
 void sync_light_calibrate_isr_placeholder(void);
 
 //=========================== private =========================================

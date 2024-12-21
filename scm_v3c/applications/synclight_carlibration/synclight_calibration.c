@@ -567,6 +567,14 @@ void decode_lighthouse(void) {
         sync_cal_registers.count_32k =
             sync_cal_registers.rdata_lsb + (sync_cal_registers.rdata_msb << 16);
 
+        // Read IF ADC_CLK counter
+        sync_cal_registers.rdata_lsb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x300000);
+        sync_cal_registers.rdata_msb =
+            *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x340000);
+        sync_cal_registers.count_IF =
+            sync_cal_registers.rdata_lsb + (sync_cal_registers.rdata_msb << 16);
+
         // only for debugging,should toggle before uart send , uart latency is
         // large
         gpio_10_toggle();
@@ -742,6 +750,12 @@ void decode_lighthouse(void) {
                                        sync_cal_registers.count_HFclock);
 
                                 sync_cal.count_calibration += 1;
+
+                                sync_light_calibrate_all_clocks(
+                                    sync_cal_registers.count_HFclock,
+                                    sync_cal_registers.count_2M,
+                                    sync_cal_registers.count_IF,
+                                    sync_cal_registers.count_LC);
                             }
                         } else {
                             sync_cal.in_valid_counting_period = true;

@@ -424,7 +424,8 @@ void sync_light_calibrate_isr(void) {
     }
 }
 
-void sync_light_calibrate_isr_individual_LC(uint32_t LC_start, uint32_t LC_end) {
+void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
+                                     uint32_t count_IF, uint32_t count_LC) {
     //	gpio_10_toggle();
 
     // This interrupt goes off when the optical register holds the value {221,
@@ -440,8 +441,7 @@ void sync_light_calibrate_isr_individual_LC(uint32_t LC_start, uint32_t LC_end) 
 
     //    int32_t t;
     uint32_t rdata_lsb, rdata_msb;
-    int32_t count_LC;
-    uint32_t count_32k, count_2M, count_HFclock, count_IF;
+    uint32_t count_32k;
     // a new LC_diff to replace the struct variable one
     // (synclight_cal_vars.cal_LC_diff).
     int32_t real_LC_diff;
@@ -465,42 +465,35 @@ void sync_light_calibrate_isr_individual_LC(uint32_t LC_start, uint32_t LC_end) 
     IF_coarse = scm3c_hw_interface_get_IF_coarse();
     IF_fine = scm3c_hw_interface_get_IF_fine();
 
-    // Disable all counters
-    ANALOG_CFG_REG__0 = 0x007F;
-
     // Keep track of how many calibration iterations have been completed
     synclight_cal_vars.optical_cal_iteration++;
 
-    // Read 32k counter
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
-    count_32k = rdata_lsb + (rdata_msb << 16);
+    // // Read 32k counter
+    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
+    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
+    // count_32k = rdata_lsb + (rdata_msb << 16);
 
-    // Read HF_CLOCK counter
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
-    count_HFclock = rdata_lsb + (rdata_msb << 16);
+    // // Read HF_CLOCK counter
+    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
+    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
+    // count_HFclock = rdata_lsb + (rdata_msb << 16);
 
-    // Read 2M counter
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
-    count_2M = rdata_lsb + (rdata_msb << 16);
+    // // Read 2M counter
+    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
+    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
+    // count_2M = rdata_lsb + (rdata_msb << 16);
 
-    // Read LC_div counter (via counter4)
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
-    count_LC = rdata_lsb + (rdata_msb << 16);
+    // // Read LC_div counter (via counter4)
+    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
+    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
+    // count_LC = rdata_lsb + (rdata_msb << 16);
 
-    // Read IF ADC_CLK counter
-    rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x300000);
-    rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x340000);
-    count_IF = rdata_lsb + (rdata_msb << 16);
+    // // Read IF ADC_CLK counter
+    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x300000);
+    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x340000);
+    // count_IF = rdata_lsb + (rdata_msb << 16);
 
-    // Reset all counters
-    ANALOG_CFG_REG__0 = 0x0000;
-
-    // Enable all counters
-    ANALOG_CFG_REG__0 = 0x3FFF;
+    printf("run in sync cal\r\n");
 
     // Don't make updates on the first two executions of this ISR
     if (synclight_cal_vars.optical_cal_iteration > 2) {
