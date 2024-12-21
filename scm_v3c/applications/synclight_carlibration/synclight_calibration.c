@@ -908,6 +908,13 @@ static inline void synclight_cal_enable_LC_calibration(void) {
     synclight_cal_vars.cal_LC_fine = LC_CAL_FINE_MIN;
     synclight_cal_vars.optical_LC_cal_enable = true;
     synclight_cal_vars.optical_LC_cal_finished = false;
+    printf(
+        "Debug: LC cal enabled, coarse=%d, mid=%d, fine=%d, enable=%d, "
+        "finished=%d\r\n",
+        synclight_cal_vars.cal_LC_coarse, synclight_cal_vars.cal_LC_mid,
+        synclight_cal_vars.cal_LC_fine,
+        synclight_cal_vars.optical_LC_cal_enable,
+        synclight_cal_vars.optical_LC_cal_finished);
     LC_FREQCHANGE(synclight_cal_vars.cal_LC_coarse,
                   synclight_cal_vars.cal_LC_mid,
                   synclight_cal_vars.cal_LC_fine);
@@ -926,6 +933,8 @@ static inline void state_opt_calibrating(void) {
     // optical_setLCTarget(250182);
     synclight_cal_setLCTarget(250182);
     config_lighthouse_mote();
+    // use inline function, this time should work.
+    synclight_cal_enable_LC_calibration();
 
     // this line only used for enable LC
     radio_txEnable();

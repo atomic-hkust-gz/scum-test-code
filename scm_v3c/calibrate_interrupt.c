@@ -437,13 +437,9 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
     // 1.1V/VDDD tap fix
     // helps reorder assembly code
     // Not completely sure why this works
-    //    uint32_t dummy = 0;
 
-    //    int32_t t;
-    uint32_t rdata_lsb, rdata_msb;
     uint32_t count_32k;
-    // a new LC_diff to replace the struct variable one
-    // (synclight_cal_vars.cal_LC_diff).
+
     int32_t real_LC_diff;
     uint32_t HF_CLOCK_fine;
     uint32_t HF_CLOCK_coarse;
@@ -531,15 +527,16 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
                            ? (tmp_countLC - tmp_LC_target)
                            : (tmp_LC_target - tmp_countLC);
 
+        synclight_cal_vars.optical_LC_cal_enable = 1;  // just test
+
         //    disable it to reduce time cost
-        // printf("condition in %u, %u, diff:%u\r\n",
-        //        synclight_cal_vars.optical_LC_cal_enable,
-        //        synclight_cal_vars.optical_LC_cal_finished, real_LC_diff);
+        printf("condition in %u, %u, diff:%u\r\n",
+               synclight_cal_vars.optical_LC_cal_enable,
+               synclight_cal_vars.optical_LC_cal_finished, real_LC_diff);
 
         if (synclight_cal_vars.optical_LC_cal_enable &&
             (!synclight_cal_vars.optical_LC_cal_finished)) {
-            // printf("condition in %u,
-            // %u",nclight_cal_vars.optical_LC_cal_enable,synclight_cal_vars.optical_LC_cal_finished);
+
             // This if function just calculate the cal_LC_diff, then give
             // coarse/mid/fine, since I am already get the real_LC_diff, I just
             // give new parameters(coarse/mid/fine)
