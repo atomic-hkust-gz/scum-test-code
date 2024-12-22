@@ -464,31 +464,6 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
     // Keep track of how many calibration iterations have been completed
     synclight_cal_vars.optical_cal_iteration++;
 
-    // // Read 32k counter
-    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x000000);
-    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x040000);
-    // count_32k = rdata_lsb + (rdata_msb << 16);
-
-    // // Read HF_CLOCK counter
-    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x100000);
-    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x140000);
-    // count_HFclock = rdata_lsb + (rdata_msb << 16);
-
-    // // Read 2M counter
-    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x180000);
-    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x1C0000);
-    // count_2M = rdata_lsb + (rdata_msb << 16);
-
-    // // Read LC_div counter (via counter4)
-    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x280000);
-    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x2C0000);
-    // count_LC = rdata_lsb + (rdata_msb << 16);
-
-    // // Read IF ADC_CLK counter
-    // rdata_lsb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x300000);
-    // rdata_msb = *(unsigned int*)(APB_ANALOG_CFG_BASE + 0x340000);
-    // count_IF = rdata_lsb + (rdata_msb << 16);
-
     printf("run in sync cal\r\n");
 
     // Don't make updates on the first two executions of this ISR
@@ -537,30 +512,6 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
         if (synclight_cal_vars.optical_LC_cal_enable &&
             (!synclight_cal_vars.optical_LC_cal_finished)) {
 
-            // This if function just calculate the cal_LC_diff, then give
-            // coarse/mid/fine, since I am already get the real_LC_diff, I just
-            // give new parameters(coarse/mid/fine)
-            // if ((count_LC <= synclight_cal_vars.LC_target) &&
-            //     (synclight_cal_vars.LC_target - count_LC <
-            //      synclight_cal_vars.cal_LC_diff)) {
-            //     printf("condition 1\r\n");
-            //     synclight_cal_vars.cal_LC_diff =
-            //         synclight_cal_vars.LC_target - count_LC;
-            //     synclight_cal_vars.LC_coarse =
-            //     synclight_cal_vars.cal_LC_coarse; synclight_cal_vars.LC_mid =
-            //     synclight_cal_vars.cal_LC_mid; synclight_cal_vars.LC_fine =
-            //     synclight_cal_vars.cal_LC_fine;
-            // } else if ((count_LC > synclight_cal_vars.LC_target) &&
-            //            (count_LC - synclight_cal_vars.LC_target <
-            //             synclight_cal_vars.cal_LC_diff)) {
-            //     printf("condition 2\r\n");
-            //     synclight_cal_vars.cal_LC_diff =
-            //         count_LC - synclight_cal_vars.LC_target;
-            //     synclight_cal_vars.LC_coarse =
-            //     synclight_cal_vars.cal_LC_coarse; synclight_cal_vars.LC_mid =
-            //     synclight_cal_vars.cal_LC_mid; synclight_cal_vars.LC_fine =
-            //     synclight_cal_vars.cal_LC_fine;
-            // }
             synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
             synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
             synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
@@ -677,7 +628,7 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
         (!synclight_cal_vars.optical_LC_cal_enable ||
          synclight_cal_vars.optical_LC_cal_finished)) {
         // Disable this ISR
-        ICER = 0x1800;
+        // ICER = 0x1800;
         synclight_cal_vars.optical_cal_iteration = 0;
         synclight_cal_vars.optical_cal_finished = 1;
 
@@ -704,7 +655,7 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
         // radio_disable_all();
 
         // Halt all counters
-        ANALOG_CFG_REG__0 = 0x0000;
+        // ANALOG_CFG_REG__0 = 0x0000;
     }
 }
 // this function use to test call calibration frenquency, so just some print.

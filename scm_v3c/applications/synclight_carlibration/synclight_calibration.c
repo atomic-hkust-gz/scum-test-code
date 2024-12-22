@@ -710,13 +710,7 @@ void decode_lighthouse(void) {
                                 // once the count_sync_light == 0,will reset
                                 // clock counters in rising edge
                                 sync_cal.count_sync_light = 0;
-                                sync_cal.several_synclights_duration =
-                                    lighthouse_ptc.t_0_start -
-                                    sync_cal.several_synclights_start;
-                                // also, the last time LC counter need be
-                                // recorded
-                                sync_cal_registers.last_sync_LC_start =
-                                    sync_cal_registers.count_LC;
+
                                 // gpio_8_toggle();  // debug,remove later
                                 // // after save last LC value, we need reset
                                 // the
@@ -743,6 +737,7 @@ void decode_lighthouse(void) {
                                 // print LC value to test if we get a right LC
                                 // in 10 synclight periods printf("LC div:
                                 // %u\n", sync_cal_registers.count_LC);
+
                                 printf("2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
                                        sync_cal_registers.count_2M,
                                        sync_cal_registers.count_LC,
@@ -926,15 +921,15 @@ static inline void state_opt_calibrating(void) {
     gpio_ext8_state = SYNC_LIGHT_ISR;
     // optical_enableLCCalibration();
 
-    // does not worked,why?
-    synclight_cal_enableLCCalibration();
-
-    // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
-    // optical_setLCTarget(250182);
-    synclight_cal_setLCTarget(250182);
     config_lighthouse_mote();
-    // use inline function, this time should work.
+    // use inline function, this time should work. remember this should after
+    // config_lighthouse_mote.
     synclight_cal_enable_LC_calibration();
+
+    // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.Then divide by
+    // 960 to get the target LC value.But here we use 250580 for sync light
+    // calibration.
+    synclight_cal_setLCTarget(250580);
 
     // this line only used for enable LC
     radio_txEnable();
