@@ -640,8 +640,10 @@ void decode_lighthouse(void) {
                     lighthouse_ptc.t_0_end - lighthouse_ptc.t_0_start;
                 // Dividing the two signals by 50us: 0.000,050/(1/10M) = 500
                 // = 0x320,99us(990ticks) for skip/sync
+                // usually soft read time is 10+us shorter than hw read time
+                // so I set the boundary condition to 300us()
                 (lighthouse_ptc.t_opt_pulse <
-                 500)  // actual boundary condition maybe a little different
+                 300)  // actual boundary condition maybe a little different
                     ? (lighthouse_ptc.flag_light_type = sweep_light)
                     : ((lighthouse_ptc.t_opt_pulse < 990)
                            ? (lighthouse_ptc.flag_light_type = sync_light)
@@ -746,11 +748,14 @@ void decode_lighthouse(void) {
 
                                 sync_cal.count_calibration += 1;
 
-                                sync_light_calibrate_all_clocks(
-                                    sync_cal_registers.count_HFclock,
-                                    sync_cal_registers.count_2M,
-                                    sync_cal_registers.count_IF,
-                                    sync_cal_registers.count_LC);
+                                if (!synclight_cal_vars
+                                         .optical_LC_cal_finished) {
+                                    sync_light_calibrate_all_clocks(
+                                        sync_cal_registers.count_HFclock,
+                                        sync_cal_registers.count_2M,
+                                        sync_cal_registers.count_IF,
+                                        sync_cal_registers.count_LC);
+                                }
                             }
                         } else {
                             sync_cal.in_valid_counting_period = true;
