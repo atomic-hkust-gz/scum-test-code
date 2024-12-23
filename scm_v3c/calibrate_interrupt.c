@@ -464,7 +464,7 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
     // Keep track of how many calibration iterations have been completed
     synclight_cal_vars.optical_cal_iteration++;
 
-    printf("run in sync cal\r\n");
+    // printf("run in sync cal\r\n"); // for debug
 
     // Don't make updates on the first two executions of this ISR
     if (synclight_cal_vars.optical_cal_iteration > 2) {
@@ -504,10 +504,6 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
 
         synclight_cal_vars.optical_LC_cal_enable = 1;  // just test
 
-        //    disable it to reduce time cost
-        printf("condition in %u, %u, diff:%u\r\n",
-               synclight_cal_vars.optical_LC_cal_enable,
-               synclight_cal_vars.optical_LC_cal_finished, real_LC_diff);
 
         if (synclight_cal_vars.optical_LC_cal_enable &&
             (!synclight_cal_vars.optical_LC_cal_finished)) {
@@ -516,14 +512,15 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
             synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
             synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
 
-            printf("count_LC: %u, LC_target: %u, LC_diff: %u\r\n", count_LC,
+            printf("Start: Count_LC: %u, LC_target: %u, Diff: %u\r\n", count_LC,
                    synclight_cal_vars.LC_target, real_LC_diff);
 
             // By moving this print, time cost 133-125ms, but I need this
             // info...so reduce synclight count to 7
-            printf("coarse: %u, mid: %u, fine: %u\n",
+            printf("Coarse: %u, Mid: %u, Fine: %u\n",
                    synclight_cal_vars.LC_coarse, synclight_cal_vars.LC_mid,
                    synclight_cal_vars.LC_fine);
+
             // why the stop codition is not related to LC_diff? I find
             // that the mid is correct enought when LC_diff is smaller
             // than 100.
@@ -639,23 +636,23 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
         synclight_cal_vars.num_LC_ch11_ticks_in_100ms = count_LC;
         synclight_cal_vars.num_HFclock_ticks_in_100ms = count_HFclock;
 
-        // Debug prints
-        // printf("LC_code=%d\r\n", synclight_cal_vars.LC_code);
-        // printf("IF_fine=%d\r\n", IF_fine);
-
-        // This was an earlier attempt to build out a complete table of
-        // LC_code for TX/RX on each channel It doesn't really work well
-        // yet so leave it commented printf("Building channel
-        // table...");
-
-        // radio_build_channel_table(LC_code);
-
-        // printf("done\r\n");
-
         // radio_disable_all();
 
         // Halt all counters
         // ANALOG_CFG_REG__0 = 0x0000;
+
+        // give final LC parameters to optimal value
+        synclight_cal_vars.LC_coarse_opt = synclight_cal_vars.LC_coarse;
+        synclight_cal_vars.LC_mid_opt = synclight_cal_vars.LC_mid;
+        synclight_cal_vars.LC_fine_opt = synclight_cal_vars.LC_fine;
+
+        // all calibrate completed, print feedback
+        printf("All calibrate completed\r\n"); 
+
+        // print final optimal LC coarse/mid/fine
+        printf("Final optimal LC coarse/mid/fine: %u, %u, %u\r\n",
+               synclight_cal_vars.LC_coarse_opt, synclight_cal_vars.LC_mid_opt,
+               synclight_cal_vars.LC_fine_opt);
     }
 }
 // this function use to test call calibration frenquency, so just some print.

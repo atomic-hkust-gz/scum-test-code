@@ -39,6 +39,10 @@ typedef struct {
     uint8_t LC_coarse;
     uint8_t LC_mid;
     uint8_t LC_fine;
+    // the optimal LC parameters
+    uint8_t LC_coarse_opt;
+    uint8_t LC_mid_opt;
+    uint8_t LC_fine_opt;
 } synclight_calibrate_vars_t;
 //=========================== prototypes ======================================
 

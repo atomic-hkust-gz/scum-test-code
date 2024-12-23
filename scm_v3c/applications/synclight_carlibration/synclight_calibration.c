@@ -460,7 +460,7 @@ void config_ble_tx_mote(void) {
     //--------------------------------------------------------
 };
 // a method used to replace old xy distinguish method from kilberg code.
-#define WIDTH_BIAS (0 - 0)
+#define WIDTH_BIAS (-100)
 void distinguish_xy(uint32_t light_duration) {
     // Identify what kind of pulse this was
 
@@ -641,9 +641,12 @@ void decode_lighthouse(void) {
                 // Dividing the two signals by 50us: 0.000,050/(1/10M) = 500
                 // = 0x320,99us(990ticks) for skip/sync
                 // usually soft read time is 10+us shorter than hw read time
-                // so I set the boundary condition to 300us()
+                // so I set the boundary condition to 320ticks(). Ofcourse,
+                // it is not accurate, we need to adjust it  300-500ticks
+                // to get the best result. Remember to change it when temperature
+                // changes.
                 (lighthouse_ptc.t_opt_pulse <
-                 300)  // actual boundary condition maybe a little different
+                 320)  // actual boundary condition maybe a little different
                     ? (lighthouse_ptc.flag_light_type = sweep_light)
                     : ((lighthouse_ptc.t_opt_pulse < 990)
                            ? (lighthouse_ptc.flag_light_type = sync_light)
@@ -740,12 +743,6 @@ void decode_lighthouse(void) {
                                 // in 10 synclight periods printf("LC div:
                                 // %u\n", sync_cal_registers.count_LC);
 
-                                printf("2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
-                                       sync_cal_registers.count_2M,
-                                       sync_cal_registers.count_LC,
-                                       sync_cal_registers.count_32k,
-                                       sync_cal_registers.count_HFclock);
-
                                 sync_cal.count_calibration += 1;
 
                                 if (!synclight_cal_vars
@@ -755,6 +752,13 @@ void decode_lighthouse(void) {
                                         sync_cal_registers.count_2M,
                                         sync_cal_registers.count_IF,
                                         sync_cal_registers.count_LC);
+                                } else {
+                                    printf(
+                                        "2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
+                                        sync_cal_registers.count_2M,
+                                        sync_cal_registers.count_LC,
+                                        sync_cal_registers.count_32k,
+                                        sync_cal_registers.count_HFclock);
                                 }
                             }
                         } else {
@@ -932,9 +936,9 @@ static inline void state_opt_calibrating(void) {
     synclight_cal_enable_LC_calibration();
 
     // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.Then divide by
-    // 960 to get the target LC value.But here we use 250580 for sync light
+    // 960 to get the target LC value.But here we use 250370 for sync light
     // calibration.
-    synclight_cal_setLCTarget(250580);
+    synclight_cal_setLCTarget(250370);
 
     // this line only used for enable LC
     radio_txEnable();
