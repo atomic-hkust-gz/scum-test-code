@@ -423,6 +423,238 @@ void sync_light_calibrate_isr(void) {
         ANALOG_CFG_REG__0 = 0x0000;
     }
 }
+
+void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
+                                     uint32_t count_IF, uint32_t count_LC) {
+    //	gpio_10_toggle();
+
+    // This interrupt goes off when the optical register holds the value {221,
+    // 176,
+    // 231, 47} This interrupt can also be used to synchronize to the start of
+    // an optical data transfer Need to make sure a new bit has been clocked in
+    // prior to returning from this ISR, or else it will immediately execute
+    // again
+    // 1.1V/VDDD tap fix
+    // helps reorder assembly code
+    // Not completely sure why this works
+
+    uint32_t count_32k;
+
+    int32_t real_LC_diff;
+    uint32_t HF_CLOCK_fine;
+    uint32_t HF_CLOCK_coarse;
+    uint32_t RC2M_coarse;
+    uint32_t RC2M_fine;
+    uint32_t RC2M_superfine;
+    //    uint32_t IF_clk_target;
+    uint32_t IF_coarse;
+    uint32_t IF_fine;
+
+    int32_t tmp_countLC, tmp_LC_target;
+
+    HF_CLOCK_fine = scm3c_hw_interface_get_HF_CLOCK_fine();
+    HF_CLOCK_coarse = scm3c_hw_interface_get_HF_CLOCK_coarse();
+    RC2M_coarse = scm3c_hw_interface_get_RC2M_coarse();
+    RC2M_fine = scm3c_hw_interface_get_RC2M_fine();
+    RC2M_superfine = scm3c_hw_interface_get_RC2M_superfine();
+    //    IF_clk_target = scm3c_hw_interface_get_IF_clk_target();
+    IF_coarse = scm3c_hw_interface_get_IF_coarse();
+    IF_fine = scm3c_hw_interface_get_IF_fine();
+
+    // Keep track of how many calibration iterations have been completed
+    synclight_cal_vars.optical_cal_iteration++;
+
+    // printf("run in sync cal\r\n"); // for debug
+
+    // Don't make updates on the first two executions of this ISR
+    if (synclight_cal_vars.optical_cal_iteration > 2) {
+        // Do correction on HF CLOCK
+        // Fine DAC step size is about 6000 counts
+        if (count_HFclock < 1997000) {  // 1997000 original value
+            if (HF_CLOCK_fine == 0) {
+                HF_CLOCK_coarse--;
+                HF_CLOCK_fine = 10;
+                synclight_cal_vars.optical_cal_iteration = 3;
+            } else {
+                HF_CLOCK_fine--;
+            }
+        }
+        if (count_HFclock > 2003000) {  // new value I picked was
+                                        // 2010000, originally 2003000
+            if (HF_CLOCK_fine == 31) {
+                HF_CLOCK_coarse++;
+                HF_CLOCK_fine = 20;
+                synclight_cal_vars.optical_cal_iteration = 3;
+            } else {
+                HF_CLOCK_fine++;
+            }
+        }
+
+        set_sys_clk_secondary_freq(HF_CLOCK_coarse, HF_CLOCK_fine);
+        scm3c_hw_interface_set_HF_CLOCK_coarse(HF_CLOCK_coarse);
+        scm3c_hw_interface_set_HF_CLOCK_fine(HF_CLOCK_fine);
+
+        // Do correction on LC
+        // debugging, why diff cannot be calculated?
+        tmp_countLC = count_LC;
+        tmp_LC_target = synclight_cal_vars.LC_target;
+        real_LC_diff = (tmp_countLC > tmp_LC_target)
+                           ? (tmp_countLC - tmp_LC_target)
+                           : (tmp_LC_target - tmp_countLC);
+
+        synclight_cal_vars.optical_LC_cal_enable = 1;  // just test
+
+
+        if (synclight_cal_vars.optical_LC_cal_enable &&
+            (!synclight_cal_vars.optical_LC_cal_finished)) {
+
+            synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
+            synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
+            synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
+
+            printf("Start: Count_LC: %u, LC_target: %u, Diff: %u\r\n", count_LC,
+                   synclight_cal_vars.LC_target, real_LC_diff);
+
+            // By moving this print, time cost 133-125ms, but I need this
+            // info...so reduce synclight count to 7
+            printf("Coarse: %u, Mid: %u, Fine: %u\n",
+                   synclight_cal_vars.LC_coarse, synclight_cal_vars.LC_mid,
+                   synclight_cal_vars.LC_fine);
+
+            // why the stop codition is not related to LC_diff? I find
+            // that the mid is correct enought when LC_diff is smaller
+            // than 100.
+            if (real_LC_diff < MIN_LC_DIFF) {
+                synclight_cal_vars.optical_LC_cal_finished = true;
+            } else {
+                ++synclight_cal_vars.cal_LC_fine;
+                if (synclight_cal_vars.cal_LC_fine > LC_CAL_FINE_MAX) {
+                    synclight_cal_vars.cal_LC_fine = LC_CAL_FINE_MIN;
+                    ++synclight_cal_vars.cal_LC_mid;
+                    if (synclight_cal_vars.cal_LC_mid > LC_CAL_MID_MAX) {
+                        synclight_cal_vars.cal_LC_mid = LC_CAL_MID_MIN;
+                        ++synclight_cal_vars.cal_LC_coarse;
+                        // why the stop codition is not related to
+                        // LC_diff?
+                        if ((synclight_cal_vars.cal_LC_coarse >
+                             LC_CAL_COARSE_MAX) ||
+                            (real_LC_diff < 100)) {
+                            synclight_cal_vars.optical_LC_cal_finished = true;
+                            printf("coarse: %u, mid: %u, fine: %u\n",
+                                   synclight_cal_vars.LC_coarse,
+                                   synclight_cal_vars.LC_mid,
+                                   synclight_cal_vars.LC_fine);
+                        }
+                    }
+                }
+            }
+
+            if (!synclight_cal_vars.optical_LC_cal_finished) {
+                LC_FREQCHANGE(synclight_cal_vars.cal_LC_coarse,
+                              synclight_cal_vars.cal_LC_mid,
+                              synclight_cal_vars.cal_LC_fine);
+            } else {
+                LC_FREQCHANGE(synclight_cal_vars.LC_coarse,
+                              synclight_cal_vars.LC_mid,
+                              synclight_cal_vars.LC_fine);
+            }
+        }
+
+        // Do correction on 2M RC
+        // Coarse step ~1100 counts, fine ~150 counts, superfine ~25
+        // Too fast
+        if (count_2M > (200600)) {
+            RC2M_coarse += 1;
+        } else {
+            if (count_2M > (200080)) {
+                RC2M_fine += 1;
+            } else {
+                if (count_2M > (200015)) {
+                    RC2M_superfine += 1;
+                }
+            }
+        }
+
+        // Too slow
+        if (count_2M < (199400)) {
+            RC2M_coarse -= 1;
+        } else {
+            if (count_2M < (199920)) {
+                RC2M_fine -= 1;
+            } else {
+                if (count_2M < (199985)) {
+                    RC2M_superfine -= 1;
+                }
+            }
+        }
+
+        set_2M_RC_frequency(31, 31, RC2M_coarse, RC2M_fine, RC2M_superfine);
+        scm3c_hw_interface_set_RC2M_coarse(RC2M_coarse);
+        scm3c_hw_interface_set_RC2M_fine(RC2M_fine);
+        scm3c_hw_interface_set_RC2M_superfine(RC2M_superfine);
+
+        // Do correction on IF RC clock
+        // Fine DAC step size is ~2800 counts
+        if (count_IF > (1600000 + 1400)) {
+            IF_fine += 1;
+        }
+        if (count_IF < (1600000 - 1400)) {
+            IF_fine -= 1;
+        }
+
+        set_IF_clock_frequency(IF_coarse, IF_fine, 0);
+        scm3c_hw_interface_set_IF_coarse(IF_coarse);
+        scm3c_hw_interface_set_IF_fine(IF_fine);
+
+        analog_scan_chain_write();
+        analog_scan_chain_load();
+    }
+
+    // Debugging output
+    // 1.1V/VDDD tap fix
+    // The print is now broken down into 3 statements instead of one big
+    // print statement
+    // doing this prevent a long string of loads back to back
+    printf("HF=%d-%d   2M=%d-%d", count_HFclock, HF_CLOCK_fine, count_2M,
+           RC2M_coarse);
+    printf(",%d,%d   LC=%d-%d   ", RC2M_fine, RC2M_superfine, count_LC,
+           synclight_cal_vars.LC_code);
+    printf("IF=%d-%d\r\n", count_IF, IF_fine);
+
+    if (synclight_cal_vars.optical_cal_iteration >= 25 &&
+        (!synclight_cal_vars.optical_LC_cal_enable ||
+         synclight_cal_vars.optical_LC_cal_finished)) {
+        // Disable this ISR
+        // ICER = 0x1800;
+        synclight_cal_vars.optical_cal_iteration = 0;
+        synclight_cal_vars.optical_cal_finished = 1;
+
+        // Store the last count values
+        synclight_cal_vars.num_32k_ticks_in_100ms = count_32k;
+        synclight_cal_vars.num_2MRC_ticks_in_100ms = count_2M;
+        synclight_cal_vars.num_IFclk_ticks_in_100ms = count_IF;
+        synclight_cal_vars.num_LC_ch11_ticks_in_100ms = count_LC;
+        synclight_cal_vars.num_HFclock_ticks_in_100ms = count_HFclock;
+
+        // radio_disable_all();
+
+        // Halt all counters
+        // ANALOG_CFG_REG__0 = 0x0000;
+
+        // give final LC parameters to optimal value
+        synclight_cal_vars.LC_coarse_opt = synclight_cal_vars.LC_coarse;
+        synclight_cal_vars.LC_mid_opt = synclight_cal_vars.LC_mid;
+        synclight_cal_vars.LC_fine_opt = synclight_cal_vars.LC_fine;
+
+        // all calibrate completed, print feedback
+        printf("All calibrate completed\r\n"); 
+
+        // print final optimal LC coarse/mid/fine
+        printf("Final optimal LC coarse/mid/fine: %u, %u, %u\r\n",
+               synclight_cal_vars.LC_coarse_opt, synclight_cal_vars.LC_mid_opt,
+               synclight_cal_vars.LC_fine_opt);
+    }
+}
 // this function use to test call calibration frenquency, so just some print.
 // use this in decode_lighthouse #600
 void sync_light_calibrate_isr_placeholder(void) {
