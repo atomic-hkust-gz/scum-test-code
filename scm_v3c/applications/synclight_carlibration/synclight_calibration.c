@@ -643,8 +643,8 @@ void decode_lighthouse(void) {
                 // usually soft read time is 10+us shorter than hw read time
                 // so I set the boundary condition to 320ticks(). Ofcourse,
                 // it is not accurate, we need to adjust it  300-500ticks
-                // to get the best result. Remember to change it when temperature
-                // changes.
+                // to get the best result. Remember to change it when
+                // temperature changes.
                 (lighthouse_ptc.t_opt_pulse <
                  320)  // actual boundary condition maybe a little different
                     ? (lighthouse_ptc.flag_light_type = sweep_light)
@@ -721,20 +721,37 @@ void decode_lighthouse(void) {
                                 // record the number of sync light calibration
                                 sync_cal.count_calibration += 1;
 
-                                if (!synclight_cal_vars
-                                         .optical_LC_cal_finished) {
-                                    sync_light_calibrate_all_clocks(
-                                        sync_cal_registers.count_HFclock,
-                                        sync_cal_registers.count_2M,
-                                        sync_cal_registers.count_IF,
-                                        sync_cal_registers.count_LC);
+                                // check LC count is valid
+                                bool valid_LC_count =
+                                    (sync_cal_registers.count_LC >= 246000 &&
+                                     sync_cal_registers.count_LC <= 253000);
+
+                                // if LC count is valid, then do calibration
+                                if (valid_LC_count) {
+                                    // if LC cal is not finished, then do
+                                    // calibration
+                                    if (!synclight_cal_vars
+                                             .optical_LC_cal_finished) {
+                                        sync_light_calibrate_all_clocks(
+                                            sync_cal_registers.count_HFclock,
+                                            sync_cal_registers.count_2M,
+                                            sync_cal_registers.count_IF,
+                                            sync_cal_registers.count_LC);
+                                    } else {
+                                        printf(
+                                            "2m: %u, lc: %u, 32k: %u, Hf: "
+                                            "%u\r\n",
+                                            sync_cal_registers.count_2M,
+                                            sync_cal_registers.count_LC,
+                                            sync_cal_registers.count_32k,
+                                            sync_cal_registers.count_HFclock);
+                                    }
                                 } else {
-                                    printf(
-                                        "2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
-                                        sync_cal_registers.count_2M,
-                                        sync_cal_registers.count_LC,
-                                        sync_cal_registers.count_32k,
-                                        sync_cal_registers.count_HFclock);
+                                    // use this print for debug
+                                    // printf(
+                                    //     "B:Invalid LC count: %u, skipping "
+                                    //     "Before clock calibrations\r\n",
+                                    //     sync_cal_registers.count_LC);
                                 }
                             }
                         } else {
