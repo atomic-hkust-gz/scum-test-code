@@ -33,6 +33,10 @@ typedef struct {
     uint32_t num_LC_ch11_ticks_in_100ms;
     uint32_t num_HFclock_ticks_in_100ms;
 
+    int32_t last_LC_diff;  // record the last LC diff value
+    bool midChange;        //     record the last mid change
+    bool coarseChange;    //     record the last coarse change
+
     // reference to calibrate
     int32_t LC_target;
     uint32_t LC_code;
@@ -69,7 +73,8 @@ void gpio_ext_10_interrupt_enable(void);
 void gpio_ext_10_interrupt_disable(void);
 void sync_light_calibrate_init(void);
 void sync_light_calibrate_isr(void);
-void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M, uint32_t count_IF, uint32_t count_LC);
+void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
+                                     uint32_t count_IF, uint32_t count_LC);
 void sync_light_calibrate_isr_placeholder(void);
 
 //=========================== private =========================================

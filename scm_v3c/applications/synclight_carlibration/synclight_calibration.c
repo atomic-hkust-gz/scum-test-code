@@ -717,32 +717,8 @@ void decode_lighthouse(void) {
                                 sync_cal.count_sync_light = 0;
 
                                 // gpio_8_toggle();  // debug,remove later
-                                // // after save last LC value, we need reset
-                                // the
-                                // // counter to prepare next calibration
-                                // process sync_cal_registers.flag_reset_counter
-                                // = 1;
 
-                                // perform_synclight_calibration();
-
-                                // printf("sync_cal_lc_in.\r\n");
-                                // sync_light_calibrate_isr();
-
-                                // here should give two parameters, maybe after
-                                // that, we do not need to artificially reduce
-                                // the number of counts
-                                // sync_light_calibrate_isr_individual_LC(
-                                //     sync_cal_registers.first_sync_LC_start,
-                                //     sync_cal_registers.last_sync_LC_start);
-
-                                // this is a null calibrate fuction to test isr
-                                // accuracy
-                                // sync_light_calibrate_isr_placeholder();
-
-                                // print LC value to test if we get a right LC
-                                // in 10 synclight periods printf("LC div:
-                                // %u\n", sync_cal_registers.count_LC);
-
+                                // record the number of sync light calibration
                                 sync_cal.count_calibration += 1;
 
                                 if (!synclight_cal_vars

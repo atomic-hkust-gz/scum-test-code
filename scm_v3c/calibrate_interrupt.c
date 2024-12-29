@@ -36,7 +36,11 @@
 //     uint32_t LC_code;
 // } synclight_calibrate_vars_t;
 
-synclight_calibrate_vars_t synclight_cal_vars;
+synclight_calibrate_vars_t synclight_cal_vars = {
+    .last_LC_diff = 0,
+    .midChange = false,
+    .coarseChange = false,
+};
 
 extern int8_t need_optical;
 //=========================== prototypes ======================================
@@ -461,6 +465,15 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
     IF_coarse = scm3c_hw_interface_get_IF_coarse();
     IF_fine = scm3c_hw_interface_get_IF_fine();
 
+    // check LC count is valid
+    bool valid_range_check = (count_LC >= 246000 && count_LC <= 253000);
+
+    if (!valid_range_check) {
+        printf("Invalid LC count: %u, skipping all clock calibrations\r\n",
+               count_LC);
+        return;  // just return, do not execute any calibration
+    }
+
     // Keep track of how many calibration iterations have been completed
     synclight_cal_vars.optical_cal_iteration++;
 
@@ -504,59 +517,104 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
 
         synclight_cal_vars.optical_LC_cal_enable = 1;  // just test
 
+        // calculate the diff change
+        int32_t diff_change = 0;
+        if (synclight_cal_vars.last_LC_diff != 0) {  // not the first time
+            // calculate the diff_change
+            diff_change =
+                (real_LC_diff > synclight_cal_vars.last_LC_diff)
+                    ? (real_LC_diff - synclight_cal_vars.last_LC_diff)
+                    : (synclight_cal_vars.last_LC_diff - real_LC_diff);
+        }
 
-        if (synclight_cal_vars.optical_LC_cal_enable &&
-            (!synclight_cal_vars.optical_LC_cal_finished)) {
+        // record the last LC diff
+        synclight_cal_vars.last_LC_diff = real_LC_diff;
 
-            synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
-            synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
-            synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
+        bool valid_gradient_filter = true;
+        // when mid is about to overflow (coarse will increase)
+        if (synclight_cal_vars.coarseChange) {
+            // check the diff change when coarse changes
+            if (diff_change > 2000 || diff_change < 500) {
+                valid_gradient_filter = false;
+                printf("Invalid diff change for coarse adjustment: %d\r\n",
+                       diff_change);
+            }
+        }
+        // when only mid changes
+        else if (synclight_cal_vars.midChange) {
+            // check the diff change when mid changes
+            if (diff_change > 130 || diff_change < 50) {
+                valid_gradient_filter = false;
+                printf("Invalid diff change for mid adjustment: %d\r\n",
+                       diff_change);
+            }
+        }
+        // only continue calibration when diff change is valid
+        if (valid_gradient_filter) {
+            // if LC calibration is enabled and not finished
+            if (synclight_cal_vars.optical_LC_cal_enable &&
+                (!synclight_cal_vars.optical_LC_cal_finished)) {
+                synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
+                synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
+                synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
 
-            printf("Start: Count_LC: %u, LC_target: %u, Diff: %u\r\n", count_LC,
-                   synclight_cal_vars.LC_target, real_LC_diff);
+                printf("Start: Count_LC: %u, LC_target: %u, Diff: %u\r\n",
+                       count_LC, synclight_cal_vars.LC_target, real_LC_diff);
 
-            // By moving this print, time cost 133-125ms, but I need this
-            // info...so reduce synclight count to 7
-            printf("Coarse: %u, Mid: %u, Fine: %u\n",
-                   synclight_cal_vars.LC_coarse, synclight_cal_vars.LC_mid,
-                   synclight_cal_vars.LC_fine);
+                // By moving this print, time cost 133-125ms, but I need this
+                // info...so reduce synclight count to 7
+                printf("Coarse: %u, Mid: %u, Fine: %u\n",
+                       synclight_cal_vars.LC_coarse, synclight_cal_vars.LC_mid,
+                       synclight_cal_vars.LC_fine);
 
-            // why the stop codition is not related to LC_diff? I find
-            // that the mid is correct enought when LC_diff is smaller
-            // than 100.
-            if (real_LC_diff < MIN_LC_DIFF) {
-                synclight_cal_vars.optical_LC_cal_finished = true;
-            } else {
-                ++synclight_cal_vars.cal_LC_fine;
-                if (synclight_cal_vars.cal_LC_fine > LC_CAL_FINE_MAX) {
-                    synclight_cal_vars.cal_LC_fine = LC_CAL_FINE_MIN;
-                    ++synclight_cal_vars.cal_LC_mid;
-                    if (synclight_cal_vars.cal_LC_mid > LC_CAL_MID_MAX) {
-                        synclight_cal_vars.cal_LC_mid = LC_CAL_MID_MIN;
-                        ++synclight_cal_vars.cal_LC_coarse;
-                        // why the stop codition is not related to
-                        // LC_diff?
-                        if ((synclight_cal_vars.cal_LC_coarse >
-                             LC_CAL_COARSE_MAX) ||
-                            (real_LC_diff < 100)) {
-                            synclight_cal_vars.optical_LC_cal_finished = true;
-                            printf("coarse: %u, mid: %u, fine: %u\n",
-                                   synclight_cal_vars.LC_coarse,
-                                   synclight_cal_vars.LC_mid,
-                                   synclight_cal_vars.LC_fine);
+                // why the stop codition is not related to LC_diff? I find
+                // that the mid is correct enought when LC_diff is smaller
+                // than 100.
+
+                // reset the midChange and coarseChange
+                synclight_cal_vars.midChange = false;
+                synclight_cal_vars.coarseChange = false;
+
+                if (real_LC_diff < MIN_LC_DIFF) {
+                    synclight_cal_vars.optical_LC_cal_finished = true;
+                } else {
+                    ++synclight_cal_vars.cal_LC_fine;
+                    if (synclight_cal_vars.cal_LC_fine > LC_CAL_FINE_MAX) {
+                        synclight_cal_vars.cal_LC_fine = LC_CAL_FINE_MIN;
+                        ++synclight_cal_vars.cal_LC_mid;
+
+                        if (synclight_cal_vars.cal_LC_mid > LC_CAL_MID_MAX) {
+                            synclight_cal_vars.cal_LC_mid = LC_CAL_MID_MIN;
+                            ++synclight_cal_vars.cal_LC_coarse;
+                            synclight_cal_vars.coarseChange = true;
+                            // why the stop codition is not related to
+                            // LC_diff?
+                            if ((synclight_cal_vars.cal_LC_coarse >
+                                 LC_CAL_COARSE_MAX) ||
+                                (real_LC_diff < 100)) {
+                                synclight_cal_vars.optical_LC_cal_finished =
+                                    true;
+                                printf("coarse: %u, mid: %u, fine: %u\n",
+                                       synclight_cal_vars.LC_coarse,
+                                       synclight_cal_vars.LC_mid,
+                                       synclight_cal_vars.LC_fine);
+                            }
+                        } else {
+                            // if mid is not overflow, then mid change=true.
+                            synclight_cal_vars.midChange = true;
                         }
                     }
                 }
-            }
 
-            if (!synclight_cal_vars.optical_LC_cal_finished) {
-                LC_FREQCHANGE(synclight_cal_vars.cal_LC_coarse,
-                              synclight_cal_vars.cal_LC_mid,
-                              synclight_cal_vars.cal_LC_fine);
-            } else {
-                LC_FREQCHANGE(synclight_cal_vars.LC_coarse,
-                              synclight_cal_vars.LC_mid,
-                              synclight_cal_vars.LC_fine);
+                if (!synclight_cal_vars.optical_LC_cal_finished) {
+                    LC_FREQCHANGE(synclight_cal_vars.cal_LC_coarse,
+                                  synclight_cal_vars.cal_LC_mid,
+                                  synclight_cal_vars.cal_LC_fine);
+                } else {
+                    LC_FREQCHANGE(synclight_cal_vars.LC_coarse,
+                                  synclight_cal_vars.LC_mid,
+                                  synclight_cal_vars.LC_fine);
+                }
             }
         }
 
@@ -647,7 +705,7 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
         synclight_cal_vars.LC_fine_opt = synclight_cal_vars.LC_fine;
 
         // all calibrate completed, print feedback
-        printf("All calibrate completed\r\n"); 
+        printf("All calibrate completed\r\n");
 
         // print final optimal LC coarse/mid/fine
         printf("Final optimal LC coarse/mid/fine: %u, %u, %u\r\n",
