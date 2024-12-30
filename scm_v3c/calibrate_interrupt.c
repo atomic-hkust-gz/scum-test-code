@@ -543,7 +543,7 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
         // when only mid changes
         else if (synclight_cal_vars.midChange) {
             // check the diff change when mid changes
-            if (diff_change > 130 || diff_change < 50) {
+            if (diff_change > 130 || diff_change < 0) {
                 valid_gradient_filter = false;
                 printf("Invalid diff change for mid adjustment: %d\r\n",
                        diff_change);
