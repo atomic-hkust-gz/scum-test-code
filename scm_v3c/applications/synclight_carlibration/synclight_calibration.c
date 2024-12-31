@@ -65,6 +65,20 @@ enum State {
     SENDING
 };
 enum State scum_state;
+
+// 添加必要的标志位
+typedef struct {
+    bool ble_packet_ready;
+    bool ble_transmission_complete;
+    uint32_t state_timeout_counter;
+    uint8_t state_retry_count;
+} state_machine_flags_t;
+
+state_machine_flags_t state_flags = {.ble_packet_ready = false,
+                                     .ble_transmission_complete = false,
+                                     .state_timeout_counter = 0,
+                                     .state_retry_count = 0};
+
 typedef struct {
     // store synclight then call synclight calibration
     uint8_t count_sync_light;
@@ -817,11 +831,65 @@ void decode_lighthouse(void) {
     }
 }
 
+// 状态切换时的日志记录
+static void log_state_transition(enum State old_state, enum State new_state) {
+    printf("State transition: %d -> %d\n", old_state, new_state);
+}
+
 static void update_state(enum State current_state) {
-    // if (current_state == DEFAULT) {
-    //     scum_state = SENDING;
-    // }
-    scum_state = OPTICAL_CALIBRATING;
+    switch (current_state) {
+        case DEFAULT:
+            //  上电后首先进入校准状态
+            scum_state = OPTICAL_CALIBRATING;
+            log_state_transition(current_state, scum_state);
+            break;
+
+        case OPTICAL_CALIBRATING:
+            // 当LC校准完成后切换到采集状态
+            if (synclight_cal_vars.optical_LC_cal_finished) {
+                scum_state = COLLECTING;
+                // 重置累计定位次数计数器
+                sync_cal.counter_localization =
+                    sync_cal.counter_lighthouse_state_period;
+                log_state_transition(current_state, scum_state);
+            }
+            break;
+
+        case COLLECTING:
+            // 采集1-2秒后切换到数据整合状态
+            if (sync_cal.counter_localization == 0) {
+                scum_state = INTEGRATING;
+                log_state_transition(current_state, scum_state);
+            }
+            break;
+
+        case INTEGRATING:
+            // 数据包生成完成后切换到发送状态
+            if (state_flags
+                    .ble_packet_ready) {  // 需要添加一个标志位表示数据包准备完成
+                scum_state = SENDING;
+                log_state_transition(current_state, scum_state);
+            }
+            break;
+
+        case SENDING:
+            // 发送完成后可以回到采集状态继续新的循环
+            if (state_flags
+                    .ble_transmission_complete) {  // 需要添加一个标志位表示发送完成
+                scum_state = COLLECTING;
+                // 重置采集计时器
+                sync_cal.counter_localization =
+                    sync_cal.counter_lighthouse_state_period;
+                log_state_transition(current_state, scum_state);
+            }
+            break;
+
+        default:
+            // 异常情况处理
+            scum_state = DEFAULT;
+            log_state_transition(current_state, scum_state);
+            break;
+    }
 }
 
 // a counter to record how many lighthouse decoding process passed.
@@ -937,7 +1005,7 @@ static inline void state_opt_calibrating(void) {
     radio_txEnable();
     //  control delay time.
     int8_t ticks = 1000;
-    while (1) {
+    while (!synclight_cal_vars.optical_LC_cal_finished) {
         // a little delay for debug, can be removed.
         while (ticks) {
             ticks--;
@@ -1165,6 +1233,7 @@ int main(void) {
                 sync_cal.need_sync_calibration = 0;
                 ble_init();
                 ble_generate_location_packet();
+                state_flags.ble_packet_ready = true;
                 break;
             case SENDING:
                 printf("State: BLE transimitting.\n");
