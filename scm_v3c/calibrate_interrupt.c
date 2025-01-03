@@ -699,10 +699,17 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
         // Halt all counters
         // ANALOG_CFG_REG__0 = 0x0000;
 
-        // give final LC parameters to optimal value
+        // save all optimal parameters to the struct
         synclight_cal_vars.LC_coarse_opt = synclight_cal_vars.LC_coarse;
         synclight_cal_vars.LC_mid_opt = synclight_cal_vars.LC_mid;
         synclight_cal_vars.LC_fine_opt = synclight_cal_vars.LC_fine;
+        synclight_cal_vars.HF_coarse_opt = HF_CLOCK_coarse;
+        synclight_cal_vars.HF_fine_opt = HF_CLOCK_fine;
+        synclight_cal_vars.RC2M_coarse_opt = RC2M_coarse;
+        synclight_cal_vars.RC2M_fine_opt = RC2M_fine;
+        synclight_cal_vars.RC2M_superfine_opt = RC2M_superfine;
+        synclight_cal_vars.IF_coarse_opt = IF_coarse;
+        synclight_cal_vars.IF_fine_opt = IF_fine;
 
         // all calibrate completed, print feedback
         printf("All calibrate completed\r\n");
@@ -711,8 +718,62 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
         printf("Final optimal LC coarse/mid/fine: %u, %u, %u\r\n",
                synclight_cal_vars.LC_coarse_opt, synclight_cal_vars.LC_mid_opt,
                synclight_cal_vars.LC_fine_opt);
+
+        printf("Optimal HF_coarse: %u, HF_fine: %u\r\n",
+               synclight_cal_vars.HF_coarse_opt,
+               synclight_cal_vars.HF_fine_opt);
+        printf("Optimal 2M_coarse: %u, 2M_fine: %u, 2M_superfine: %u\r\n",
+               synclight_cal_vars.RC2M_coarse_opt,
+               synclight_cal_vars.RC2M_fine_opt,
+               synclight_cal_vars.RC2M_superfine_opt);
+        printf("Optimal IF_coarse: %u, IF_fine: %u\r\n",
+               synclight_cal_vars.IF_coarse_opt,
+               synclight_cal_vars.IF_fine_opt);
     }
 }
+
+// set all clocks to optimal values
+void sync_light_calibrate_set_optimal_clocks(void) {
+    // set HF
+    set_sys_clk_secondary_freq(synclight_cal_vars.HF_coarse_opt,
+                               synclight_cal_vars.HF_fine_opt);
+    scm3c_hw_interface_set_HF_CLOCK_coarse(synclight_cal_vars.HF_coarse_opt);
+    scm3c_hw_interface_set_HF_CLOCK_fine(synclight_cal_vars.HF_fine_opt);
+    // set LC
+    LC_FREQCHANGE(synclight_cal_vars.LC_coarse_opt,
+                  synclight_cal_vars.LC_mid_opt,
+                  synclight_cal_vars.LC_fine_opt);
+    // set 2M
+    set_2M_RC_frequency(31, 31, synclight_cal_vars.RC2M_coarse_opt,
+                        synclight_cal_vars.RC2M_fine_opt,
+                        synclight_cal_vars.RC2M_superfine_opt);
+    scm3c_hw_interface_set_RC2M_coarse(synclight_cal_vars.RC2M_coarse_opt);
+    scm3c_hw_interface_set_RC2M_fine(synclight_cal_vars.RC2M_fine_opt);
+    scm3c_hw_interface_set_RC2M_superfine(
+        synclight_cal_vars.RC2M_superfine_opt);
+    // set IF
+    set_IF_clock_frequency(synclight_cal_vars.IF_coarse_opt,
+                           synclight_cal_vars.IF_fine_opt, 0);
+    scm3c_hw_interface_set_IF_coarse(synclight_cal_vars.IF_coarse_opt);
+    scm3c_hw_interface_set_IF_fine(synclight_cal_vars.IF_fine_opt);
+    // essential setup when change clocks settings
+    analog_scan_chain_write();
+    analog_scan_chain_load();
+    // print the result
+    printf(
+        "Set clock parameters:\r\n"
+        "  HF     : (coarse=%d, fine=%d)\r\n"
+        "  2M     : (coarse=%d, fine=%d, superfine=%d)\r\n"
+        "  LC     : (coarse=%d, mid=%d, fine=%d)\r\n"
+        "  IF     : (coarse=%d, fine=%d)\r\n"
+        "All clocks Done.\r\n",
+        synclight_cal_vars.HF_coarse_opt, synclight_cal_vars.HF_fine_opt,
+        synclight_cal_vars.RC2M_coarse_opt, synclight_cal_vars.RC2M_fine_opt,
+        synclight_cal_vars.RC2M_superfine_opt, synclight_cal_vars.LC_coarse_opt,
+        synclight_cal_vars.LC_mid_opt, synclight_cal_vars.LC_fine_opt,
+        synclight_cal_vars.IF_coarse_opt, synclight_cal_vars.IF_fine_opt);
+}
+
 // this function use to test call calibration frenquency, so just some print.
 // use this in decode_lighthouse #600
 void sync_light_calibrate_isr_placeholder(void) {

@@ -35,7 +35,7 @@ typedef struct {
 
     int32_t last_LC_diff;  // record the last LC diff value
     bool midChange;        //     record the last mid change
-    bool coarseChange;    //     record the last coarse change
+    bool coarseChange;     //     record the last coarse change
 
     // reference to calibrate
     int32_t LC_target;
@@ -47,6 +47,15 @@ typedef struct {
     uint8_t LC_coarse_opt;
     uint8_t LC_mid_opt;
     uint8_t LC_fine_opt;
+
+    uint8_t HF_coarse_opt;
+    uint8_t HF_fine_opt;
+    uint8_t RC2M_coarse_opt;
+    uint8_t RC2M_fine_opt;
+    uint8_t RC2M_superfine_opt;
+    uint8_t IF_coarse_opt;
+    uint8_t IF_fine_opt;
+
 } synclight_calibrate_vars_t;
 //=========================== prototypes ======================================
 
@@ -76,6 +85,7 @@ void sync_light_calibrate_isr(void);
 void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
                                      uint32_t count_IF, uint32_t count_LC);
 void sync_light_calibrate_isr_placeholder(void);
+void sync_light_calibrate_set_optimal_clocks(void);
 
 //=========================== private =========================================
 

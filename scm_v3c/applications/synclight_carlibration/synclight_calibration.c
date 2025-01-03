@@ -906,6 +906,8 @@ static inline void state_optical_collecting(void) {
     // disable all interrupts. rftimer interrupt is used in ble
     // transmitting
     ICER = 0xFFFF;
+    // set clock to optimal state
+    // sync_light_calibrate_set_optimal_clocks(); 
     // close to 2s for changing  state between localization and
     // calibration
     sync_cal.counter_localization = sync_cal.counter_lighthouse_state_period;
