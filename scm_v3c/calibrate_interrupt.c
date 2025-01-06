@@ -695,7 +695,7 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
            synclight_cal_vars.LC_code);
     printf("IF=%d-%d\r\n", count_IF, IF_fine);
 
-    if (synclight_cal_vars.optical_cal_iteration >= 25 &&
+    if (synclight_cal_vars.optical_cal_iteration >= 3 &&
         (!synclight_cal_vars.optical_LC_cal_enable ||
          synclight_cal_vars.optical_LC_cal_finished)) {
         // Disable this ISR

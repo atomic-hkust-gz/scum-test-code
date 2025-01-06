@@ -1018,7 +1018,7 @@ static inline void state_optical_collecting(void) {
     // calibration part.
     sync_cal.need_sync_calibration = 0;
 
-    reload_config_lighthouse_mote();
+    // reload_config_lighthouse_mote();
     // disable all interrupts. rftimer interrupt is used in ble
     // transmitting
     ICER = 0xFFFF;
