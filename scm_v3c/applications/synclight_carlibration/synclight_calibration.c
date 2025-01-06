@@ -369,6 +369,122 @@ void config_lighthouse_mote(void) {
     analog_scan_chain_load();
 }
 
+// this config will not reset any global variables, others are the same as
+// config_lighthouse_mote()
+void reload_config_lighthouse_mote(void) {
+    uint8_t t;
+    scm3c_hw_interface_init();
+    optical_init();
+    radio_init();
+    rftimer_init();
+    // a copy of optical_init
+    reload_sync_light_calibrate_init();
+
+    //  I think RF timer needs to be reset before use, but not essential.
+    // RF Timer rolls over at this value and starts a new cycle
+    RFTIMER_REG__MAX_COUNT = 0xFFFFFFFF;
+    // Enable RF Timer
+    RFTIMER_REG__CONTROL = 0x7;
+
+    // Init LDO control
+    init_ldo_control();
+
+    // Select banks for GPIO inputs
+    GPI_control(0, 0, 0, 0);
+    // Select banks for GPIO outputs, now IO 8,10 is used for test(XX6X)
+    GPO_control(0, 0, 6, 0);
+    // Set all GPIOs as outputs
+    GPI_enables(0x000F);  // 0008=io3?
+    GPO_enables(0xFFFF);
+
+    // Set HCLK source as HF_CLOCK
+    set_asc_bit(1147);
+
+    // Set initial coarse/fine on HF_CLOCK
+    // coarse 0:4 = 860 861 875b 876b 877b
+    // fine 0:4 870 871 872 873 874b
+    set_sys_clk_secondary_freq(INIT_HF_CLOCK_COARSE, INIT_HF_CLOCK_FINE);
+
+    // Set RFTimer source as HF_CLOCK
+    set_asc_bit(1151);
+
+    // Disable LF_CLOCK
+    set_asc_bit(553);
+
+    // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
+    // 10MHz (inverted, so 0000 0010-->1111 1101)
+    // infact, the max freq is 10M, 20M need to raise the supply voltage for
+    // VDDD. once change HCLK, UART baudrate will change too.
+    set_asc_bit(49);
+    set_asc_bit(48);
+    set_asc_bit(47);
+    set_asc_bit(46);
+    set_asc_bit(45);
+    set_asc_bit(44);
+    clear_asc_bit(43);
+    set_asc_bit(42);
+
+    // try to use divider on HFCLK
+    // Set HCLK divider to 2(0000 0010->0000 0110,only third low bit need
+    // invert) infact, the max freq is 10M, 20M need to raise the supply voltage
+    // for VDDD. HCLK is for cortex core, if you do not set it to 10M, it stay
+    // at 5M by default. if HCLK is 5M, RFtimer can not faster than 5M. I do not
+    // know the reason.
+    clear_asc_bit(57);
+    clear_asc_bit(56);
+    clear_asc_bit(55);
+    clear_asc_bit(54);
+    clear_asc_bit(53);
+    set_asc_bit(52);  // inverted
+    set_asc_bit(51);
+    clear_asc_bit(50);
+
+    // Set RF Timer divider to pass through so that RF Timer is 20 MHz,(not
+    // faster than 5M if didnt set HCLK)
+    //  passthrough means ignore the divider.
+    // set_asc_bit(36);
+
+    // need LC, IF, 2M to calibrate.
+    // Set 2M RC as source for chip CLK
+    set_asc_bit(1156);
+
+    // Enable 32k for cal
+    set_asc_bit(623);
+
+    // Enable passthrough on chip CLK divider
+    set_asc_bit(41);
+
+    // Init counter setup - set all to analog_cfg control
+    // scm3c_hw_interface_vars.ASC[0] is leftmost
+    // scm3c_hw_interface_vars.ASC[0] |= 0x6F800000;
+    for (t = 2; t < 9; t++) set_asc_bit(t);
+
+    // Init RX
+    radio_init_rx_MF();
+
+    // Init TX
+    radio_init_tx();
+
+    // Set initial IF ADC clock frequency
+    set_IF_clock_frequency(INIT_IF_COARSE, INIT_IF_FINE, 0);  // cr
+
+    // Set initial TX clock frequency
+    set_2M_RC_frequency(31, 31, INIT_RC2M_COARSE, INIT_RC2M_FINE,
+                        INIT_RC2M_SUPERFINE);  // cr
+
+    // Turn on RC 2M for cal
+    set_asc_bit(1114);  // cr
+
+    // Set initial LO frequency
+    LC_monotonic(DEFAULT_INIT_LC_CODE);
+
+    // Init divider settings
+    radio_init_divider(2000);
+
+    analog_scan_chain_write();
+    analog_scan_chain_load();
+}
+
 void config_ble_tx_mote(void) {
     uint8_t t;
 
@@ -902,12 +1018,13 @@ static inline void state_optical_collecting(void) {
     // calibration part.
     sync_cal.need_sync_calibration = 0;
 
-    config_lighthouse_mote();
+    reload_config_lighthouse_mote();
     // disable all interrupts. rftimer interrupt is used in ble
     // transmitting
     ICER = 0xFFFF;
     // set clock to optimal state
-    // sync_light_calibrate_set_optimal_clocks(); 
+    sync_light_calibrate_set_optimal_clocks();
+
     // close to 2s for changing  state between localization and
     // calibration
     sync_cal.counter_localization = sync_cal.counter_lighthouse_state_period;
@@ -993,7 +1110,7 @@ static inline void state_opt_calibrating(void) {
     gpio_ext8_state = SYNC_LIGHT_ISR;
     // optical_enableLCCalibration();
 
-    config_lighthouse_mote();
+    reload_config_lighthouse_mote();
     // use inline function, this time should work. remember this should after
     // config_lighthouse_mote.
     synclight_cal_enable_LC_calibration();

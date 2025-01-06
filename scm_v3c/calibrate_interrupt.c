@@ -62,7 +62,23 @@ void gpio_ext_10_interrupt_enable(void) { ISER |= 0x4000; }
 void gpio_ext_10_interrupt_disable(void) { ICER |= 0x4000; }
 
 void sync_light_calibrate_init(void) {
+    // I dont need reset this to ZERO
     memset(&synclight_cal_vars, 0, sizeof(synclight_calibrate_vars_t));
+
+    // Target radio LO freq = 2.4025G
+    // Divide ratio is currently 480*2
+    // Calibration counts for 100ms
+    synclight_cal_vars.LC_target = REFERENCE_LC_TARGET;
+    synclight_cal_vars.LC_code = DEFAULT_INIT_LC_CODE;
+
+    synclight_cal_vars.LC_coarse = DEFAULT_INIT_LC_COARSE;
+    synclight_cal_vars.LC_mid = DEFAULT_INIT_LC_MID;
+    synclight_cal_vars.LC_fine = DEFAULT_INIT_LC_FINE;
+}
+
+void reload_sync_light_calibrate_init(void) {
+    // I dont need reset this to ZERO
+    // memset(&synclight_cal_vars, 0, sizeof(synclight_calibrate_vars_t));
 
     // Target radio LO freq = 2.4025G
     // Divide ratio is currently 480*2
@@ -735,10 +751,10 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
 // set all clocks to optimal values
 void sync_light_calibrate_set_optimal_clocks(void) {
     // set HF
-    set_sys_clk_secondary_freq(synclight_cal_vars.HF_coarse_opt,
-                               synclight_cal_vars.HF_fine_opt);
-    scm3c_hw_interface_set_HF_CLOCK_coarse(synclight_cal_vars.HF_coarse_opt);
-    scm3c_hw_interface_set_HF_CLOCK_fine(synclight_cal_vars.HF_fine_opt);
+    // set_sys_clk_secondary_freq(synclight_cal_vars.HF_coarse_opt,
+    //                            synclight_cal_vars.HF_fine_opt);
+    // scm3c_hw_interface_set_HF_CLOCK_coarse(synclight_cal_vars.HF_coarse_opt);
+    // scm3c_hw_interface_set_HF_CLOCK_fine(synclight_cal_vars.HF_fine_opt);
     // set LC
     LC_FREQCHANGE(synclight_cal_vars.LC_coarse_opt,
                   synclight_cal_vars.LC_mid_opt,
@@ -757,8 +773,8 @@ void sync_light_calibrate_set_optimal_clocks(void) {
     scm3c_hw_interface_set_IF_coarse(synclight_cal_vars.IF_coarse_opt);
     scm3c_hw_interface_set_IF_fine(synclight_cal_vars.IF_fine_opt);
     // essential setup when change clocks settings
-    analog_scan_chain_write();
-    analog_scan_chain_load();
+    // analog_scan_chain_write();
+    // analog_scan_chain_load();
     // print the result
     printf(
         "Set clock parameters:\r\n"
@@ -772,6 +788,9 @@ void sync_light_calibrate_set_optimal_clocks(void) {
         synclight_cal_vars.RC2M_superfine_opt, synclight_cal_vars.LC_coarse_opt,
         synclight_cal_vars.LC_mid_opt, synclight_cal_vars.LC_fine_opt,
         synclight_cal_vars.IF_coarse_opt, synclight_cal_vars.IF_fine_opt);
+    // essential setup when change clocks settings
+    analog_scan_chain_write();
+    analog_scan_chain_load();
 }
 
 // this function use to test call calibration frenquency, so just some print.

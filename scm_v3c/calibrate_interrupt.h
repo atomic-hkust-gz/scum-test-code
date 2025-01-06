@@ -8,7 +8,7 @@
 #include "scm3c_hw_interface.h"
 
 //=========================== defines =========================================
-#define LC_CAL_COARSE_MIN 18
+#define LC_CAL_COARSE_MIN 19
 #define LC_CAL_COARSE_MAX 25
 #define LC_CAL_MID_MIN 0
 #define LC_CAL_MID_MAX 31
@@ -81,6 +81,7 @@ void gpio_ext_9_interrupt_disable(void);
 void gpio_ext_10_interrupt_enable(void);
 void gpio_ext_10_interrupt_disable(void);
 void sync_light_calibrate_init(void);
+void reload_sync_light_calibrate_init(void);
 void sync_light_calibrate_isr(void);
 void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
                                      uint32_t count_IF, uint32_t count_LC);
