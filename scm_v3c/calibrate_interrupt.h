@@ -73,6 +73,7 @@ void synclight_cal_enable(void);
 void perform_synclight_calibration(void);
 // void optical_sfd_isr(void);
 
+
 void calibration_isr(void);
 void gpio_ext_3_interrupt_enable(void);
 void gpio_ext_3_interrupt_disable(void);
