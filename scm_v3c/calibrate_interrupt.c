@@ -756,9 +756,9 @@ void sync_light_calibrate_set_optimal_clocks(void) {
     // scm3c_hw_interface_set_HF_CLOCK_coarse(synclight_cal_vars.HF_coarse_opt);
     // scm3c_hw_interface_set_HF_CLOCK_fine(synclight_cal_vars.HF_fine_opt);
     // set LC
-    // LC_FREQCHANGE(synclight_cal_vars.LC_coarse_opt,
-    //               synclight_cal_vars.LC_mid_opt,
-    //               synclight_cal_vars.LC_fine_opt);
+    LC_FREQCHANGE(synclight_cal_vars.LC_coarse_opt,
+                  synclight_cal_vars.LC_mid_opt,
+                  synclight_cal_vars.LC_fine_opt);
     // set 2M
     set_2M_RC_frequency(31, 31, synclight_cal_vars.RC2M_coarse_opt,
                         synclight_cal_vars.RC2M_fine_opt,
@@ -767,6 +767,19 @@ void sync_light_calibrate_set_optimal_clocks(void) {
     scm3c_hw_interface_set_RC2M_fine(synclight_cal_vars.RC2M_fine_opt);
     scm3c_hw_interface_set_RC2M_superfine(
         synclight_cal_vars.RC2M_superfine_opt);
+
+    // essential setup when change clocks settings
+    analog_scan_chain_write();
+    analog_scan_chain_load();
+
+    // set LC, this function does not use ASC[] to modify the LC clock, which
+    // means write/load the chain will overwrite this value.I put it after the
+    // write/load to make sure the ASC[] is not overwritten. but remember the
+    // ASC[] is not equals to real LC clock now.
+    LC_FREQCHANGE(synclight_cal_vars.LC_coarse_opt,
+                  synclight_cal_vars.LC_mid_opt,
+                  synclight_cal_vars.LC_fine_opt);
+
     // set IF
     // set_IF_clock_frequency(synclight_cal_vars.IF_coarse_opt,
     //                        synclight_cal_vars.IF_fine_opt, 0);
@@ -797,19 +810,16 @@ void print_ASC(void) {
     // should equals to ASC_LEN@scm3c_hw_interface.c
     uint32_t asc_array[ASC_LEN];
     int i;
-    
+
     // 获取所有ASC值
     scm3c_hw_interface_get_asc(asc_array);
-    
+
     // 打印
     printf("\r\n------- ASC Configuration -------\r\n");
     for (i = 0; i < ASC_LEN; i++) {
-        printf("ASC[%2d] = 0x%08X;   // %d-%d\r\n", 
-               i, 
-               asc_array[i], 
-               i*32, 
-               i*32+31);
-        
+        printf("ASC[%2d] = 0x%08X;   // %d-%d\r\n", i, asc_array[i], i * 32,
+               i * 32 + 31);
+
         if ((i + 1) % 8 == 0) {
             printf("\r\n");
         }
