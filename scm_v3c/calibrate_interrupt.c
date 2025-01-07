@@ -751,14 +751,11 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
 // set all clocks to optimal values
 void sync_light_calibrate_set_optimal_clocks(void) {
     // set HF
-    // set_sys_clk_secondary_freq(synclight_cal_vars.HF_coarse_opt,
-    //                            synclight_cal_vars.HF_fine_opt);
-    // scm3c_hw_interface_set_HF_CLOCK_coarse(synclight_cal_vars.HF_coarse_opt);
-    // scm3c_hw_interface_set_HF_CLOCK_fine(synclight_cal_vars.HF_fine_opt);
-    // set LC
-    LC_FREQCHANGE(synclight_cal_vars.LC_coarse_opt,
-                  synclight_cal_vars.LC_mid_opt,
-                  synclight_cal_vars.LC_fine_opt);
+    set_sys_clk_secondary_freq(synclight_cal_vars.HF_coarse_opt,
+                               synclight_cal_vars.HF_fine_opt);
+    scm3c_hw_interface_set_HF_CLOCK_coarse(synclight_cal_vars.HF_coarse_opt);
+    scm3c_hw_interface_set_HF_CLOCK_fine(synclight_cal_vars.HF_fine_opt);
+
     // set 2M
     set_2M_RC_frequency(31, 31, synclight_cal_vars.RC2M_coarse_opt,
                         synclight_cal_vars.RC2M_fine_opt,
