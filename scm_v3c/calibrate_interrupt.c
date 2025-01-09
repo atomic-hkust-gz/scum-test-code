@@ -799,8 +799,8 @@ void sync_light_calibrate_set_optimal_clocks(void) {
         synclight_cal_vars.LC_mid_opt, synclight_cal_vars.LC_fine_opt,
         synclight_cal_vars.IF_coarse_opt, synclight_cal_vars.IF_fine_opt);
     // essential setup when change clocks settings
-    analog_scan_chain_write();
-    analog_scan_chain_load();
+    // analog_scan_chain_write();
+    // analog_scan_chain_load();
 }
 
 void print_ASC(void) {
