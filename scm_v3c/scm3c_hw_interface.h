@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 //=========================== define ==========================================
-
+#define ASC_LEN 38
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
@@ -23,6 +23,8 @@ uint32_t scm3c_hw_interface_get_RC2M_superfine(void);
 uint32_t scm3c_hw_interface_get_IF_clk_target(void);
 uint32_t scm3c_hw_interface_get_IF_coarse(void);
 uint32_t scm3c_hw_interface_get_IF_fine(void);
+// get and send ASC value to new array
+void scm3c_hw_interface_get_asc(uint32_t* asc_array);
 
 //===== set function
 

@@ -36,7 +36,11 @@
 //     uint32_t LC_code;
 // } synclight_calibrate_vars_t;
 
-synclight_calibrate_vars_t synclight_cal_vars;
+synclight_calibrate_vars_t synclight_cal_vars = {
+    .last_LC_diff = 0,
+    .midChange = false,
+    .coarseChange = false,
+};
 
 extern int8_t need_optical;
 //=========================== prototypes ======================================
@@ -58,7 +62,23 @@ void gpio_ext_10_interrupt_enable(void) { ISER |= 0x4000; }
 void gpio_ext_10_interrupt_disable(void) { ICER |= 0x4000; }
 
 void sync_light_calibrate_init(void) {
+    // I dont need reset this to ZERO
     memset(&synclight_cal_vars, 0, sizeof(synclight_calibrate_vars_t));
+
+    // Target radio LO freq = 2.4025G
+    // Divide ratio is currently 480*2
+    // Calibration counts for 100ms
+    synclight_cal_vars.LC_target = REFERENCE_LC_TARGET;
+    synclight_cal_vars.LC_code = DEFAULT_INIT_LC_CODE;
+
+    synclight_cal_vars.LC_coarse = DEFAULT_INIT_LC_COARSE;
+    synclight_cal_vars.LC_mid = DEFAULT_INIT_LC_MID;
+    synclight_cal_vars.LC_fine = DEFAULT_INIT_LC_FINE;
+}
+
+void reload_sync_light_calibrate_init(void) {
+    // I dont need reset this to ZERO
+    // memset(&synclight_cal_vars, 0, sizeof(synclight_calibrate_vars_t));
 
     // Target radio LO freq = 2.4025G
     // Divide ratio is currently 480*2
@@ -461,6 +481,15 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
     IF_coarse = scm3c_hw_interface_get_IF_coarse();
     IF_fine = scm3c_hw_interface_get_IF_fine();
 
+    // check LC count is valid
+    bool valid_range_check = (count_LC >= 246000 && count_LC <= 253000);
+
+    if (!valid_range_check) {
+        printf("Invalid LC count: %u, skipping all clock calibrations\r\n",
+               count_LC);
+        return;  // just return, do not execute any calibration
+    }
+
     // Keep track of how many calibration iterations have been completed
     synclight_cal_vars.optical_cal_iteration++;
 
@@ -504,59 +533,104 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
 
         synclight_cal_vars.optical_LC_cal_enable = 1;  // just test
 
+        // calculate the diff change
+        int32_t diff_change = 0;
+        if (synclight_cal_vars.last_LC_diff != 0) {  // not the first time
+            // calculate the diff_change
+            diff_change =
+                (real_LC_diff > synclight_cal_vars.last_LC_diff)
+                    ? (real_LC_diff - synclight_cal_vars.last_LC_diff)
+                    : (synclight_cal_vars.last_LC_diff - real_LC_diff);
+        }
 
-        if (synclight_cal_vars.optical_LC_cal_enable &&
-            (!synclight_cal_vars.optical_LC_cal_finished)) {
+        // record the last LC diff
+        synclight_cal_vars.last_LC_diff = real_LC_diff;
 
-            synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
-            synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
-            synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
+        bool valid_gradient_filter = true;
+        // when mid is about to overflow (coarse will increase)
+        if (synclight_cal_vars.coarseChange) {
+            // check the diff change when coarse changes
+            if (diff_change > 2000 || diff_change < 500) {
+                valid_gradient_filter = false;
+                printf("Invalid diff change for coarse adjustment: %d\r\n",
+                       diff_change);
+            }
+        }
+        // when only mid changes
+        else if (synclight_cal_vars.midChange) {
+            // check the diff change when mid changes
+            if (diff_change > 130 || diff_change < 0) {
+                valid_gradient_filter = false;
+                printf("Invalid diff change for mid adjustment: %d\r\n",
+                       diff_change);
+            }
+        }
+        // only continue calibration when diff change is valid
+        if (valid_gradient_filter) {
+            // if LC calibration is enabled and not finished
+            if (synclight_cal_vars.optical_LC_cal_enable &&
+                (!synclight_cal_vars.optical_LC_cal_finished)) {
+                synclight_cal_vars.LC_coarse = synclight_cal_vars.cal_LC_coarse;
+                synclight_cal_vars.LC_mid = synclight_cal_vars.cal_LC_mid;
+                synclight_cal_vars.LC_fine = synclight_cal_vars.cal_LC_fine;
 
-            printf("Start: Count_LC: %u, LC_target: %u, Diff: %u\r\n", count_LC,
-                   synclight_cal_vars.LC_target, real_LC_diff);
+                printf("Start: Count_LC: %u, LC_target: %u, Diff: %u\r\n",
+                       count_LC, synclight_cal_vars.LC_target, real_LC_diff);
 
-            // By moving this print, time cost 133-125ms, but I need this
-            // info...so reduce synclight count to 7
-            printf("Coarse: %u, Mid: %u, Fine: %u\n",
-                   synclight_cal_vars.LC_coarse, synclight_cal_vars.LC_mid,
-                   synclight_cal_vars.LC_fine);
+                // By moving this print, time cost 133-125ms, but I need this
+                // info...so reduce synclight count to 7
+                printf("Coarse: %u, Mid: %u, Fine: %u\n",
+                       synclight_cal_vars.LC_coarse, synclight_cal_vars.LC_mid,
+                       synclight_cal_vars.LC_fine);
 
-            // why the stop codition is not related to LC_diff? I find
-            // that the mid is correct enought when LC_diff is smaller
-            // than 100.
-            if (real_LC_diff < MIN_LC_DIFF) {
-                synclight_cal_vars.optical_LC_cal_finished = true;
-            } else {
-                ++synclight_cal_vars.cal_LC_fine;
-                if (synclight_cal_vars.cal_LC_fine > LC_CAL_FINE_MAX) {
-                    synclight_cal_vars.cal_LC_fine = LC_CAL_FINE_MIN;
-                    ++synclight_cal_vars.cal_LC_mid;
-                    if (synclight_cal_vars.cal_LC_mid > LC_CAL_MID_MAX) {
-                        synclight_cal_vars.cal_LC_mid = LC_CAL_MID_MIN;
-                        ++synclight_cal_vars.cal_LC_coarse;
-                        // why the stop codition is not related to
-                        // LC_diff?
-                        if ((synclight_cal_vars.cal_LC_coarse >
-                             LC_CAL_COARSE_MAX) ||
-                            (real_LC_diff < 100)) {
-                            synclight_cal_vars.optical_LC_cal_finished = true;
-                            printf("coarse: %u, mid: %u, fine: %u\n",
-                                   synclight_cal_vars.LC_coarse,
-                                   synclight_cal_vars.LC_mid,
-                                   synclight_cal_vars.LC_fine);
+                // why the stop codition is not related to LC_diff? I find
+                // that the mid is correct enought when LC_diff is smaller
+                // than 100.
+
+                // reset the midChange and coarseChange
+                synclight_cal_vars.midChange = false;
+                synclight_cal_vars.coarseChange = false;
+
+                if (real_LC_diff < MIN_LC_DIFF) {
+                    synclight_cal_vars.optical_LC_cal_finished = true;
+                } else {
+                    ++synclight_cal_vars.cal_LC_fine;
+                    if (synclight_cal_vars.cal_LC_fine > LC_CAL_FINE_MAX) {
+                        synclight_cal_vars.cal_LC_fine = LC_CAL_FINE_MIN;
+                        ++synclight_cal_vars.cal_LC_mid;
+
+                        if (synclight_cal_vars.cal_LC_mid > LC_CAL_MID_MAX) {
+                            synclight_cal_vars.cal_LC_mid = LC_CAL_MID_MIN;
+                            ++synclight_cal_vars.cal_LC_coarse;
+                            synclight_cal_vars.coarseChange = true;
+                            // why the stop codition is not related to
+                            // LC_diff?
+                            if ((synclight_cal_vars.cal_LC_coarse >
+                                 LC_CAL_COARSE_MAX) ||
+                                (real_LC_diff < 100)) {
+                                synclight_cal_vars.optical_LC_cal_finished =
+                                    true;
+                                printf("coarse: %u, mid: %u, fine: %u\n",
+                                       synclight_cal_vars.LC_coarse,
+                                       synclight_cal_vars.LC_mid,
+                                       synclight_cal_vars.LC_fine);
+                            }
+                        } else {
+                            // if mid is not overflow, then mid change=true.
+                            synclight_cal_vars.midChange = true;
                         }
                     }
                 }
-            }
 
-            if (!synclight_cal_vars.optical_LC_cal_finished) {
-                LC_FREQCHANGE(synclight_cal_vars.cal_LC_coarse,
-                              synclight_cal_vars.cal_LC_mid,
-                              synclight_cal_vars.cal_LC_fine);
-            } else {
-                LC_FREQCHANGE(synclight_cal_vars.LC_coarse,
-                              synclight_cal_vars.LC_mid,
-                              synclight_cal_vars.LC_fine);
+                if (!synclight_cal_vars.optical_LC_cal_finished) {
+                    LC_FREQCHANGE(synclight_cal_vars.cal_LC_coarse,
+                                  synclight_cal_vars.cal_LC_mid,
+                                  synclight_cal_vars.cal_LC_fine);
+                } else {
+                    LC_FREQCHANGE(synclight_cal_vars.LC_coarse,
+                                  synclight_cal_vars.LC_mid,
+                                  synclight_cal_vars.LC_fine);
+                }
             }
         }
 
@@ -621,7 +695,7 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
            synclight_cal_vars.LC_code);
     printf("IF=%d-%d\r\n", count_IF, IF_fine);
 
-    if (synclight_cal_vars.optical_cal_iteration >= 25 &&
+    if (synclight_cal_vars.optical_cal_iteration >= 3 &&
         (!synclight_cal_vars.optical_LC_cal_enable ||
          synclight_cal_vars.optical_LC_cal_finished)) {
         // Disable this ISR
@@ -641,20 +715,115 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
         // Halt all counters
         // ANALOG_CFG_REG__0 = 0x0000;
 
-        // give final LC parameters to optimal value
+        // save all optimal parameters to the struct
         synclight_cal_vars.LC_coarse_opt = synclight_cal_vars.LC_coarse;
         synclight_cal_vars.LC_mid_opt = synclight_cal_vars.LC_mid;
         synclight_cal_vars.LC_fine_opt = synclight_cal_vars.LC_fine;
+        synclight_cal_vars.HF_coarse_opt = HF_CLOCK_coarse;
+        synclight_cal_vars.HF_fine_opt = HF_CLOCK_fine;
+        synclight_cal_vars.RC2M_coarse_opt = RC2M_coarse;
+        synclight_cal_vars.RC2M_fine_opt = RC2M_fine;
+        synclight_cal_vars.RC2M_superfine_opt = RC2M_superfine;
+        synclight_cal_vars.IF_coarse_opt = IF_coarse;
+        synclight_cal_vars.IF_fine_opt = IF_fine;
 
         // all calibrate completed, print feedback
-        printf("All calibrate completed\r\n"); 
+        printf("All calibrate completed\r\n");
 
         // print final optimal LC coarse/mid/fine
         printf("Final optimal LC coarse/mid/fine: %u, %u, %u\r\n",
                synclight_cal_vars.LC_coarse_opt, synclight_cal_vars.LC_mid_opt,
                synclight_cal_vars.LC_fine_opt);
+
+        printf("Optimal HF_coarse: %u, HF_fine: %u\r\n",
+               synclight_cal_vars.HF_coarse_opt,
+               synclight_cal_vars.HF_fine_opt);
+        printf("Optimal 2M_coarse: %u, 2M_fine: %u, 2M_superfine: %u\r\n",
+               synclight_cal_vars.RC2M_coarse_opt,
+               synclight_cal_vars.RC2M_fine_opt,
+               synclight_cal_vars.RC2M_superfine_opt);
+        printf("Optimal IF_coarse: %u, IF_fine: %u\r\n",
+               synclight_cal_vars.IF_coarse_opt,
+               synclight_cal_vars.IF_fine_opt);
     }
 }
+
+// set all clocks to optimal values
+void sync_light_calibrate_set_optimal_clocks(void) {
+    // set HF
+    set_sys_clk_secondary_freq(synclight_cal_vars.HF_coarse_opt,
+                               synclight_cal_vars.HF_fine_opt);
+    scm3c_hw_interface_set_HF_CLOCK_coarse(synclight_cal_vars.HF_coarse_opt);
+    scm3c_hw_interface_set_HF_CLOCK_fine(synclight_cal_vars.HF_fine_opt);
+
+    // set 2M
+    set_2M_RC_frequency(31, 31, synclight_cal_vars.RC2M_coarse_opt,
+                        synclight_cal_vars.RC2M_fine_opt,
+                        synclight_cal_vars.RC2M_superfine_opt);
+    scm3c_hw_interface_set_RC2M_coarse(synclight_cal_vars.RC2M_coarse_opt);
+    scm3c_hw_interface_set_RC2M_fine(synclight_cal_vars.RC2M_fine_opt);
+    scm3c_hw_interface_set_RC2M_superfine(
+        synclight_cal_vars.RC2M_superfine_opt);
+
+    // essential setup when change clocks settings
+    analog_scan_chain_write();
+    analog_scan_chain_load();
+
+    // set LC, this function does not use ASC[] to modify the LC clock, which
+    // means write/load the chain will overwrite this value.I put it after the
+    // write/load to make sure the ASC[] is not overwritten. but remember the
+    // ASC[] is not equals to real LC clock now.
+    LC_FREQCHANGE(synclight_cal_vars.LC_coarse_opt,
+                  synclight_cal_vars.LC_mid_opt,
+                  synclight_cal_vars.LC_fine_opt);
+
+    // set IF
+    // set_IF_clock_frequency(synclight_cal_vars.IF_coarse_opt,
+    //                        synclight_cal_vars.IF_fine_opt, 0);
+    // scm3c_hw_interface_set_IF_coarse(synclight_cal_vars.IF_coarse_opt);
+    // scm3c_hw_interface_set_IF_fine(synclight_cal_vars.IF_fine_opt);
+    // essential setup when change clocks settings
+    // analog_scan_chain_write();
+    // analog_scan_chain_load();
+    // print the result
+    printf(
+        "Set clock parameters:\r\n"
+        "  HF     : (coarse=%d, fine=%d)\r\n"
+        "  2M     : (coarse=%d, fine=%d, superfine=%d)\r\n"
+        "  LC     : (coarse=%d, mid=%d, fine=%d)\r\n"
+        "  IF     : (coarse=%d, fine=%d)\r\n"
+        "All clocks Done.\r\n",
+        synclight_cal_vars.HF_coarse_opt, synclight_cal_vars.HF_fine_opt,
+        synclight_cal_vars.RC2M_coarse_opt, synclight_cal_vars.RC2M_fine_opt,
+        synclight_cal_vars.RC2M_superfine_opt, synclight_cal_vars.LC_coarse_opt,
+        synclight_cal_vars.LC_mid_opt, synclight_cal_vars.LC_fine_opt,
+        synclight_cal_vars.IF_coarse_opt, synclight_cal_vars.IF_fine_opt);
+    // essential setup when change clocks settings
+    // analog_scan_chain_write();
+    // analog_scan_chain_load();
+}
+
+void print_ASC(void) {
+    // should equals to ASC_LEN@scm3c_hw_interface.c
+    uint32_t asc_array[ASC_LEN];
+    int i;
+
+    // 获取所有ASC值
+    scm3c_hw_interface_get_asc(asc_array);
+
+    // 打印
+    printf("\r\n------- ASC Configuration -------\r\n");
+    for (i = 0; i < ASC_LEN; i++) {
+        printf("ASC[%2d] = 0x%08X;   // %d-%d\r\n", i, asc_array[i], i * 32,
+               i * 32 + 31);
+
+        if ((i + 1) % 8 == 0) {
+            printf("\r\n");
+        }
+    }
+    printf("--------------------------------\r\n");
+}
+
 // this function use to test call calibration frenquency, so just some print.
 // use this in decode_lighthouse #600
 void sync_light_calibrate_isr_placeholder(void) {

@@ -11,7 +11,7 @@
 
 //=========================== definition ======================================
 
-#define ASC_LEN 38
+
 #define DAC_2M_SETTING_LEN 5
 
 // initialized value for frequency configuration
@@ -112,6 +112,12 @@ uint32_t scm3c_hw_interface_get_IF_coarse(void) {
 }
 uint32_t scm3c_hw_interface_get_IF_fine(void) {
     return scm3c_hw_interface_vars.IF_fine;
+}
+// get and send ASC value to new array
+void scm3c_hw_interface_get_asc(uint32_t* asc_array) {
+    if (asc_array != NULL) {
+        memcpy(asc_array, scm3c_hw_interface_vars.ASC, ASC_LEN * sizeof(uint32_t));
+    }
 }
 
 //===== set function

@@ -65,6 +65,20 @@ enum State {
     SENDING
 };
 enum State scum_state;
+
+// 添加必要的标志位
+typedef struct {
+    bool ble_packet_ready;
+    bool ble_transmission_complete;
+    uint32_t state_timeout_counter;
+    uint8_t state_retry_count;
+} state_machine_flags_t;
+
+state_machine_flags_t state_flags = {.ble_packet_ready = false,
+                                     .ble_transmission_complete = false,
+                                     .state_timeout_counter = 0,
+                                     .state_retry_count = 0};
+
 typedef struct {
     // store synclight then call synclight calibration
     uint8_t count_sync_light;
@@ -94,7 +108,7 @@ sync_light_calibration_t sync_cal = {.count_sync_light = 0,
                                      .several_synclights_duration = 0,
                                      .count_calibration = 0,
                                      .counter_localization = 0,
-                                     .counter_lighthouse_state_period = 20000,
+                                     .counter_lighthouse_state_period = 20,
                                      .counter_global_timer = 0};
 // indicate the type of light
 enum Lighthouse_light_type {
@@ -189,7 +203,7 @@ sync_light_cal_Registers_t sync_cal_registers = {
 // If true, sweep through all fine codes.
 #define BLE_TX_SWEEP_FINE true
 //  #define BLE_TX_SWEEP_FINE false
-#define BLE_CALIBRATE_LC true
+#define BLE_CALIBRATE_LC false
 //  LC cal gives an optimal value, but we can decide whether use this.
 #define BLE_USE_OPTIMAL_LC true
 // BLE TX period in milliseconds.
@@ -355,13 +369,129 @@ void config_lighthouse_mote(void) {
     analog_scan_chain_load();
 }
 
+// this config will not reset any global variables, others are the same as
+// config_lighthouse_mote()
+void reload_config_lighthouse_mote(void) {
+    uint8_t t;
+    scm3c_hw_interface_init();
+    optical_init();
+    radio_init();
+    rftimer_init();
+    // a copy of optical_init
+    reload_sync_light_calibrate_init();
+
+    //  I think RF timer needs to be reset before use, but not essential.
+    // RF Timer rolls over at this value and starts a new cycle
+    RFTIMER_REG__MAX_COUNT = 0xFFFFFFFF;
+    // Enable RF Timer
+    RFTIMER_REG__CONTROL = 0x7;
+
+    // Init LDO control
+    init_ldo_control();
+
+    // Select banks for GPIO inputs
+    GPI_control(0, 0, 0, 0);
+    // Select banks for GPIO outputs, now IO 8,10 is used for test(XX6X)
+    GPO_control(0, 0, 6, 0);
+    // Set all GPIOs as outputs
+    GPI_enables(0x000F);  // 0008=io3?
+    GPO_enables(0xFFFF);
+
+    // Set HCLK source as HF_CLOCK
+    set_asc_bit(1147);
+
+    // Set initial coarse/fine on HF_CLOCK
+    // coarse 0:4 = 860 861 875b 876b 877b
+    // fine 0:4 870 871 872 873 874b
+    set_sys_clk_secondary_freq(INIT_HF_CLOCK_COARSE, INIT_HF_CLOCK_FINE);
+
+    // Set RFTimer source as HF_CLOCK
+    set_asc_bit(1151);
+
+    // Disable LF_CLOCK
+    set_asc_bit(553);
+
+    // HF_CLOCK will be trimmed to 20MHz, so set RFTimer div value to 2 to get
+    // 10MHz (inverted, so 0000 0010-->1111 1101)
+    // infact, the max freq is 10M, 20M need to raise the supply voltage for
+    // VDDD. once change HCLK, UART baudrate will change too.
+    set_asc_bit(49);
+    set_asc_bit(48);
+    set_asc_bit(47);
+    set_asc_bit(46);
+    set_asc_bit(45);
+    set_asc_bit(44);
+    clear_asc_bit(43);
+    set_asc_bit(42);
+
+    // try to use divider on HFCLK
+    // Set HCLK divider to 2(0000 0010->0000 0110,only third low bit need
+    // invert) infact, the max freq is 10M, 20M need to raise the supply voltage
+    // for VDDD. HCLK is for cortex core, if you do not set it to 10M, it stay
+    // at 5M by default. if HCLK is 5M, RFtimer can not faster than 5M. I do not
+    // know the reason.
+    clear_asc_bit(57);
+    clear_asc_bit(56);
+    clear_asc_bit(55);
+    clear_asc_bit(54);
+    clear_asc_bit(53);
+    set_asc_bit(52);  // inverted
+    set_asc_bit(51);
+    clear_asc_bit(50);
+
+    // Set RF Timer divider to pass through so that RF Timer is 20 MHz,(not
+    // faster than 5M if didnt set HCLK)
+    //  passthrough means ignore the divider.
+    // set_asc_bit(36);
+
+    // need LC, IF, 2M to calibrate.
+    // Set 2M RC as source for chip CLK
+    set_asc_bit(1156);
+
+    // Enable 32k for cal
+    set_asc_bit(623);
+
+    // Enable passthrough on chip CLK divider
+    set_asc_bit(41);
+
+    // Init counter setup - set all to analog_cfg control
+    // scm3c_hw_interface_vars.ASC[0] is leftmost
+    // scm3c_hw_interface_vars.ASC[0] |= 0x6F800000;
+    for (t = 2; t < 9; t++) set_asc_bit(t);
+
+    // Init RX
+    radio_init_rx_MF();
+
+    // Init TX
+    radio_init_tx();
+
+    // Set initial IF ADC clock frequency
+    set_IF_clock_frequency(INIT_IF_COARSE, INIT_IF_FINE, 0);  // cr
+
+    // Set initial TX clock frequency
+    set_2M_RC_frequency(31, 31, INIT_RC2M_COARSE, INIT_RC2M_FINE,
+                        INIT_RC2M_SUPERFINE);  // cr
+
+    // Turn on RC 2M for cal
+    set_asc_bit(1114);  // cr
+
+    // Set initial LO frequency
+    LC_monotonic(DEFAULT_INIT_LC_CODE);
+
+    // Init divider settings
+    radio_init_divider(2000);
+
+    analog_scan_chain_write();
+    analog_scan_chain_load();
+}
+
 void config_ble_tx_mote(void) {
     uint8_t t;
 
     scm3c_hw_interface_init();
     optical_init();
     // a copy of optical_init
-    sync_light_calibrate_init();
+    // sync_light_calibrate_init();
     radio_init();
     rftimer_init();
     ble_init();
@@ -643,8 +773,8 @@ void decode_lighthouse(void) {
                 // usually soft read time is 10+us shorter than hw read time
                 // so I set the boundary condition to 320ticks(). Ofcourse,
                 // it is not accurate, we need to adjust it  300-500ticks
-                // to get the best result. Remember to change it when temperature
-                // changes.
+                // to get the best result. Remember to change it when
+                // temperature changes.
                 (lighthouse_ptc.t_opt_pulse <
                  320)  // actual boundary condition maybe a little different
                     ? (lighthouse_ptc.flag_light_type = sweep_light)
@@ -717,48 +847,41 @@ void decode_lighthouse(void) {
                                 sync_cal.count_sync_light = 0;
 
                                 // gpio_8_toggle();  // debug,remove later
-                                // // after save last LC value, we need reset
-                                // the
-                                // // counter to prepare next calibration
-                                // process sync_cal_registers.flag_reset_counter
-                                // = 1;
 
-                                // perform_synclight_calibration();
-
-                                // printf("sync_cal_lc_in.\r\n");
-                                // sync_light_calibrate_isr();
-
-                                // here should give two parameters, maybe after
-                                // that, we do not need to artificially reduce
-                                // the number of counts
-                                // sync_light_calibrate_isr_individual_LC(
-                                //     sync_cal_registers.first_sync_LC_start,
-                                //     sync_cal_registers.last_sync_LC_start);
-
-                                // this is a null calibrate fuction to test isr
-                                // accuracy
-                                // sync_light_calibrate_isr_placeholder();
-
-                                // print LC value to test if we get a right LC
-                                // in 10 synclight periods printf("LC div:
-                                // %u\n", sync_cal_registers.count_LC);
-
+                                // record the number of sync light calibration
                                 sync_cal.count_calibration += 1;
 
-                                if (!synclight_cal_vars
-                                         .optical_LC_cal_finished) {
-                                    sync_light_calibrate_all_clocks(
-                                        sync_cal_registers.count_HFclock,
-                                        sync_cal_registers.count_2M,
-                                        sync_cal_registers.count_IF,
-                                        sync_cal_registers.count_LC);
+                                // check LC count is valid
+                                bool valid_LC_count =
+                                    (sync_cal_registers.count_LC >= 246000 &&
+                                     sync_cal_registers.count_LC <= 253000);
+
+                                // if LC count is valid, then do calibration
+                                if (valid_LC_count) {
+                                    // if LC cal is not finished, then do
+                                    // calibration
+                                    if (!synclight_cal_vars
+                                             .optical_LC_cal_finished) {
+                                        sync_light_calibrate_all_clocks(
+                                            sync_cal_registers.count_HFclock,
+                                            sync_cal_registers.count_2M,
+                                            sync_cal_registers.count_IF,
+                                            sync_cal_registers.count_LC);
+                                    } else {
+                                        printf(
+                                            "2m: %u, lc: %u, 32k: %u, Hf: "
+                                            "%u\r\n",
+                                            sync_cal_registers.count_2M,
+                                            sync_cal_registers.count_LC,
+                                            sync_cal_registers.count_32k,
+                                            sync_cal_registers.count_HFclock);
+                                    }
                                 } else {
-                                    printf(
-                                        "2m: %u, lc: %u, 32k: %u, Hf: %u\r\n",
-                                        sync_cal_registers.count_2M,
-                                        sync_cal_registers.count_LC,
-                                        sync_cal_registers.count_32k,
-                                        sync_cal_registers.count_HFclock);
+                                    // use this print for debug
+                                    // printf(
+                                    //     "B:Invalid LC count: %u, skipping "
+                                    //     "Before clock calibrations\r\n",
+                                    //     sync_cal_registers.count_LC);
                                 }
                             }
                         } else {
@@ -824,11 +947,66 @@ void decode_lighthouse(void) {
     }
 }
 
+// 状态切换时的日志记录
+static void log_state_transition(enum State old_state, enum State new_state) {
+    printf("State transition: %d -> %d\n", old_state, new_state);
+}
+
 static void update_state(enum State current_state) {
-    // if (current_state == DEFAULT) {
-    //     scum_state = SENDING;
-    // }
-    scum_state = OPTICAL_CALIBRATING;
+    switch (current_state) {
+        case DEFAULT:
+            //  上电后首先进入校准状态
+            scum_state = OPTICAL_CALIBRATING;
+            log_state_transition(current_state, scum_state);
+            break;
+
+        case OPTICAL_CALIBRATING:
+            // 当LC校准完成后切换到采集状态
+            if (synclight_cal_vars.optical_LC_cal_finished) {
+                scum_state = COLLECTING;
+                // 重置累计定位次数计数器
+                sync_cal.counter_localization =
+                    sync_cal.counter_lighthouse_state_period;
+                log_state_transition(current_state, scum_state);
+            }
+            break;
+
+        case COLLECTING:
+            // 采集1-2秒后切换到数据整合状态
+            if (sync_cal.counter_localization == 0) {
+                scum_state = INTEGRATING;
+                log_state_transition(current_state, scum_state);
+            }
+            break;
+
+        case INTEGRATING:
+            // 数据包生成完成后切换到发送状态
+            if (state_flags
+                    .ble_packet_ready) {  // 需要添加一个标志位表示数据包准备完成
+                scum_state = SENDING;
+                log_state_transition(current_state, scum_state);
+            }
+            break;
+
+        case SENDING:
+            // 发送完成后可以回到采集状态继续新的循环
+            if (state_flags
+                    .ble_transmission_complete) {  // 需要添加一个标志位表示发送完成
+                scum_state = COLLECTING;
+                // 重置采集计时器
+                sync_cal.counter_localization =
+                    sync_cal.counter_lighthouse_state_period;
+                log_state_transition(current_state, scum_state);
+                state_flags.ble_transmission_complete = false;
+            }
+            break;
+
+        default:
+            // 异常情况处理
+            scum_state = DEFAULT;
+            log_state_transition(current_state, scum_state);
+            break;
+    }
 }
 
 // a counter to record how many lighthouse decoding process passed.
@@ -841,10 +1019,16 @@ static inline void state_optical_collecting(void) {
     // calibration part.
     sync_cal.need_sync_calibration = 0;
 
-    config_lighthouse_mote();
+    reload_config_lighthouse_mote();
     // disable all interrupts. rftimer interrupt is used in ble
     // transmitting
     ICER = 0xFFFF;
+    // see the ASC value before set clock to optimal state
+    print_ASC();
+    // set clock to optimal state
+    sync_light_calibrate_set_optimal_clocks();
+    // see the ASC value after set clock to optimal state
+    print_ASC();
     // close to 2s for changing  state between localization and
     // calibration
     sync_cal.counter_localization = sync_cal.counter_lighthouse_state_period;
@@ -861,25 +1045,8 @@ static inline void state_optical_collecting(void) {
             // sync_light_calibrate_isr();
             printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", lighthouse_ptc.A_X,
                    lighthouse_ptc.A_Y, lighthouse_ptc.B_X, lighthouse_ptc.B_Y);
-        }
-        sync_cal.counter_localization--;
-        // when comes to the period transfer statement, we use a
-        // counter to change state
-        if (sync_cal.counter_localization == 0) {
-            switch (sync_cal.need_sync_calibration) {
-                case 0:
-                    // sync_cal.need_sync_calibration = 1;
-                    sync_cal.counter_localization =
-                        sync_cal.counter_lighthouse_state_period + 30000;
-                    break;
-                case 1:
-                    // sync_cal.need_sync_calibration = 0;
-                    sync_cal.counter_localization =
-                        sync_cal.counter_lighthouse_state_period;
-                    break;
-                default:
-                    break;
-            }
+            printf("Remaining packets: %d\n", sync_cal.counter_localization);
+            sync_cal.counter_localization--;
         }
     }
     //      wait some time then print to uart
@@ -930,7 +1097,7 @@ static inline void state_opt_calibrating(void) {
     gpio_ext8_state = SYNC_LIGHT_ISR;
     // optical_enableLCCalibration();
 
-    config_lighthouse_mote();
+    reload_config_lighthouse_mote();
     // use inline function, this time should work. remember this should after
     // config_lighthouse_mote.
     synclight_cal_enable_LC_calibration();
@@ -944,7 +1111,7 @@ static inline void state_opt_calibrating(void) {
     radio_txEnable();
     //  control delay time.
     int8_t ticks = 1000;
-    while (1) {
+    while (!synclight_cal_vars.optical_LC_cal_finished) {
         // a little delay for debug, can be removed.
         while (ticks) {
             ticks--;
@@ -956,89 +1123,20 @@ static inline void state_opt_calibrating(void) {
 
 // I guess it does not need init each sending state
 bool sync_cal_ble_init_enable = true;
-// how many times to transmite ble packets in single SENDING state
-uint8_t counter_ble_tx;
 
 static inline void state_sending(void) {
     printf("State: BLE transimitting.\n");
     // enable/disable synclight calibration
-    sync_cal.need_sync_calibration = 1;
+    sync_cal.need_sync_calibration = 0;
     // now I use optical cal for debugging
     // gpio_ext8_state = OPTICAL_ISR;
     gpio_ext8_state = SYNC_LIGHT_ISR;
 
     // set this value to control how many times to transmitting
-    counter_ble_tx = 10;
+    // how many times to transmite ble packets in single SENDING state
+    uint8_t counter_ble_tx = 10;
 
-    // if (sync_cal_ble_init_enable == true) {
-    //     // initialize_mote();
-    //     config_ble_tx_mote();
-
-    //     // Initialize BLE TX.
-    //     printf("Initializing BLE TX.\n");
-    //     ble_init();
-    //     ble_init_tx();
-
-    //     // Configure the RF timer.
-    //     rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
-    //     rftimer_enable_interrupts();
-    //     rftimer_enable_interrupts_by_id(7);
-
-    //     analog_scan_chain_write();
-    //     analog_scan_chain_load();
-
-    //     crc_check();
-    //     // perform_calibration();
-    // }
-
-#if BLE_CALIBRATE_LC
-    // optical_vars.optical_cal_finished = false;
-    // optical_enableLCCalibration();
-
-    // does not worked,why?
-    synclight_cal_enableLCCalibration();
-    // this executed in radio_txEnable(), from perform_calibration(), I open it
-    // here.but I believe this included in 0x78 since 0110 and 0111
-    // ANALOG_CFG_REG__10 = 0x68;
-    // Turn on LO, DIV, PA, and IF
-    // move it below
-    // ANALOG_CFG_REG__10 = 0x78;
-
-    // Turn off polyphase and disable mixer
-    ANALOG_CFG_REG__16 = 0x6;
-
-    // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
-    // optical_setLCTarget(250182);
-    synclight_cal_setLCTarget(250182);
-#endif
-    printf("Config lighthouse mode\r\n");
-    config_lighthouse_mote();
-    // Turn on LO, DIV, PA, and IF
-    ANALOG_CFG_REG__10 = 0x78;
-    analog_scan_chain_write();
-    analog_scan_chain_load();
-    // Do not use perfom_calibration() here, it has radio_rxEnable() function,
-    // which will affect accuracy.
-
-    //  Enable optical SFD interrupt for optical calibration
-    optical_enable();
-
-    printf("Start synclight calibrating\r\n");
-    ICER = 0xFFFF;
-    // Wait for optical cal to finish
-    // while (!optical_getCalibrationFinished());
-
-    // use inline function, this time should work.
-    synclight_cal_enable_LC_calibration();
-
-    printf("LC_CAL_ON GOING. enbable:%u,fininshed:%u \r\n",
-           synclight_cal_vars.optical_LC_cal_enable,
-           synclight_cal_vars.optical_LC_cal_finished);
-    while (!synclight_cal_getCalibrationFinished()) {
-        decode_lighthouse();
-    };
-
-    printf("Cal complete\r\n");
+    // printf("Cal complete\r\n");
     if (sync_cal_ble_init_enable == true) {
         // initialize_mote();
         config_ble_tx_mote();
@@ -1062,32 +1160,37 @@ static inline void state_sending(void) {
 
     // Disable static divider to save power
     divProgram(480, 0, 0);
+    // set clock to optimal state
+    sync_light_calibrate_set_optimal_clocks();
 
     // Configure coarse, mid, and fine codes for TX.
 #if BLE_CALIBRATE_LC
 
-    g_ble_tx_tuning_code.coarse = synclight_cal_getLCCoarse();
-    g_ble_tx_tuning_code.mid = synclight_cal_getLCMid();
-    g_ble_tx_tuning_code.fine = synclight_cal_getLCFine();
+    g_ble_tx_tuning_code.coarse = synclight_cal_vars.LC_coarse_opt;
+    g_ble_tx_tuning_code.mid = synclight_cal_vars.LC_mid_opt;
+    g_ble_tx_tuning_code.fine = synclight_cal_vars.LC_fine_opt;
 #else
     // CHANGE THESE VALUES AFTER LC CALIBRATION.
-    app_vars.tx_coarse = 23;
-    app_vars.tx_mid = 11;
-    app_vars.tx_fine = 23;
+    g_ble_tx_tuning_code.coarse = synclight_cal_vars.LC_coarse_opt;
+    g_ble_tx_tuning_code.mid = synclight_cal_vars.LC_mid_opt;
+    g_ble_tx_tuning_code.fine = synclight_cal_vars.LC_fine_opt;
 #endif
 
     // Generate a BLE packet.
     ble_generate_packet();
 
-    while (true) {  // counter_ble_tx
+    while (counter_ble_tx) {  // counter_ble_tx
         if (g_ble_tx_trigger) {
-            printf("Triggering BLE TX.\n");
+            printf("Triggering BLE TX. Remaining packet groups: %d\n",
+                   counter_ble_tx);
             ble_tx_trigger();
             g_ble_tx_trigger = false;
             delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
+            counter_ble_tx--;
         }
         // counter_ble_tx--;
     }
+    state_flags.ble_transmission_complete = true;
 }
 //=========================== main ============================================
 
@@ -1172,6 +1275,7 @@ int main(void) {
                 sync_cal.need_sync_calibration = 0;
                 ble_init();
                 ble_generate_location_packet();
+                state_flags.ble_packet_ready = true;
                 break;
             case SENDING:
                 printf("State: BLE transimitting.\n");
