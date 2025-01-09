@@ -71,6 +71,11 @@
 // Maximum BLE packet length.
 #define BLE_MAX_PACKET_LENGTH 64
 
+// Lighthouse position data definitions
+#define BLE_LIGHTHOUSE_HEADER     0x15  // 自定义header
+#define BLE_LIGHTHOUSE_GAP_CODE   0xA5  // 自定义GAP code
+#define BLE_LIGHTHOUSE_DATA_LENGTH 8    // 4个uint32_t = 16字节
+
 // Initialize BLE.
 void ble_init(void);
 

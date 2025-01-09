@@ -9,6 +9,7 @@
 #include "radio.h"
 #include "scm3c_hw_interface.h"
 #include "tuning.h"
+#include "lighthouse_protocol.h"
 
 typedef struct {
     uint8_t packet[BLE_MAX_PACKET_LENGTH];
@@ -23,6 +24,7 @@ typedef struct {
     bool temperature_tx_en;
     bool data_tx_en;
     bool appearance_en;
+    bool lighthouse_tx_en;
 
     // BLE packet data.
     char name[BLE_SHORT_NAME_LENGTH];
@@ -32,9 +34,12 @@ typedef struct {
     uint32_t count_32k;
     double temperature;
     uint8_t data[BLE_CUSTOM_DATA_LENGTH];
+    uint8_t lighthouse_data[BLE_LIGHTHOUSE_DATA_LENGTH];
 } ble_vars_t;
 
 ble_vars_t ble_vars;
+
+extern lighthouse_protocol_t lighthouse_ptc;
 
 static inline void ble_load_tx_arb_fifo(void) {
     // Initialize variables.
@@ -116,9 +121,9 @@ void ble_init(void) {
     ble_vars.name_tx_en = true;
     ble_vars.name[0] = 'S';
     ble_vars.name[1] = 'C';
-    ble_vars.name[2] = 'U';
-    ble_vars.name[3] = 'M';
-    ble_vars.name[4] = '3';
+    ble_vars.name[2] = 'M';
+    ble_vars.name[3] = '3';
+    ble_vars.name[4] = 'C';
 
     // Set appearance to Mouse
     ble_vars.appearance_en = true;
@@ -126,8 +131,9 @@ void ble_init(void) {
     ble_vars.appearance[1] = 0x03;
 
     ble_vars.tuning_code_tx_en = true;
-    ble_vars.counters_tx_en = true;
-    ble_vars.temperature_tx_en = true;
+    ble_vars.counters_tx_en = false;
+    ble_vars.temperature_tx_en = false;
+    ble_vars.lighthouse_tx_en = true;
     // ble_vars.data_tx_en = true;
 }
 
@@ -230,6 +236,23 @@ void ble_generate_packet(void) {
         for (k = 0; k < BLE_GAP_APPEARANCE_LENGTH; ++k) {
             pdu_crc[j++] = flipChar(ble_vars.appearance[k]);
         }
+    }
+
+    if (ble_vars.lighthouse_tx_en) {
+        pdu_crc[j++] = BLE_LIGHTHOUSE_HEADER;
+        pdu_crc[j++] = BLE_LIGHTHOUSE_GAP_CODE;
+
+        // 添加A_X (32位，4字节)
+        pdu_crc[j++] = flipChar((lighthouse_ptc.A_X >> 24) & 0xFF);  // MSB
+        pdu_crc[j++] = flipChar((lighthouse_ptc.A_X >> 16) & 0xFF);
+        pdu_crc[j++] = flipChar((lighthouse_ptc.A_X >> 8) & 0xFF);
+        pdu_crc[j++] = flipChar(lighthouse_ptc.A_X & 0xFF);          // LSB
+
+        // 添加A_Y (32位，4字节)
+        pdu_crc[j++] = flipChar((lighthouse_ptc.A_Y >> 24) & 0xFF);  // MSB
+        pdu_crc[j++] = flipChar((lighthouse_ptc.A_Y >> 16) & 0xFF);
+        pdu_crc[j++] = flipChar((lighthouse_ptc.A_Y >> 8) & 0xFF);
+        pdu_crc[j++] = flipChar(lighthouse_ptc.A_Y & 0xFF);          // LSB
     }
 
     for (j = 0; j < BLE_PDU_LENGTH; ++j) {
