@@ -108,7 +108,7 @@ sync_light_calibration_t sync_cal = {.count_sync_light = 0,
                                      .several_synclights_duration = 0,
                                      .count_calibration = 0,
                                      .counter_localization = 0,
-                                     .counter_lighthouse_state_period = 20000,
+                                     .counter_lighthouse_state_period = 20,
                                      .counter_global_timer = 0};
 // indicate the type of light
 enum Lighthouse_light_type {
@@ -1044,25 +1044,7 @@ static inline void state_optical_collecting(void) {
             // sync_light_calibrate_isr();
             printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", lighthouse_ptc.A_X,
                    lighthouse_ptc.A_Y, lighthouse_ptc.B_X, lighthouse_ptc.B_Y);
-        }
-        sync_cal.counter_localization--;
-        // when comes to the period transfer statement, we use a
-        // counter to change state
-        if (sync_cal.counter_localization == 0) {
-            switch (sync_cal.need_sync_calibration) {
-                case 0:
-                    // sync_cal.need_sync_calibration = 1;
-                    sync_cal.counter_localization =
-                        sync_cal.counter_lighthouse_state_period + 30000;
-                    break;
-                case 1:
-                    // sync_cal.need_sync_calibration = 0;
-                    sync_cal.counter_localization =
-                        sync_cal.counter_lighthouse_state_period;
-                    break;
-                default:
-                    break;
-            }
+            sync_cal.counter_localization--;
         }
     }
     //      wait some time then print to uart
@@ -1249,9 +1231,9 @@ static inline void state_sending(void) {
     // Configure coarse, mid, and fine codes for TX.
 #if BLE_CALIBRATE_LC
 
-    g_ble_tx_tuning_code.coarse = synclight_cal_getLCCoarse();
-    g_ble_tx_tuning_code.mid = synclight_cal_getLCMid();
-    g_ble_tx_tuning_code.fine = synclight_cal_getLCFine();
+    g_ble_tx_tuning_code.coarse = synclight_cal_vars.LC_coarse_opt;
+    g_ble_tx_tuning_code.mid = synclight_cal_vars.LC_mid_opt;
+    g_ble_tx_tuning_code.fine = synclight_cal_vars.LC_fine_opt;
 #else
     // CHANGE THESE VALUES AFTER LC CALIBRATION.
     app_vars.tx_coarse = 23;
