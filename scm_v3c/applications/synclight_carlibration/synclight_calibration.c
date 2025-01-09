@@ -997,6 +997,7 @@ static void update_state(enum State current_state) {
                 sync_cal.counter_localization =
                     sync_cal.counter_lighthouse_state_period;
                 log_state_transition(current_state, scum_state);
+                state_flags.ble_transmission_complete = false;
             }
             break;
 
@@ -1044,6 +1045,7 @@ static inline void state_optical_collecting(void) {
             // sync_light_calibrate_isr();
             printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", lighthouse_ptc.A_X,
                    lighthouse_ptc.A_Y, lighthouse_ptc.B_X, lighthouse_ptc.B_Y);
+            printf("Remaining packets: %d\n", sync_cal.counter_localization);
             sync_cal.counter_localization--;
         }
     }
@@ -1121,8 +1123,6 @@ static inline void state_opt_calibrating(void) {
 
 // I guess it does not need init each sending state
 bool sync_cal_ble_init_enable = true;
-// how many times to transmite ble packets in single SENDING state
-uint8_t counter_ble_tx;
 
 static inline void state_sending(void) {
     printf("State: BLE transimitting.\n");
@@ -1133,75 +1133,8 @@ static inline void state_sending(void) {
     gpio_ext8_state = SYNC_LIGHT_ISR;
 
     // set this value to control how many times to transmitting
-    counter_ble_tx = 10;
-
-    // if (sync_cal_ble_init_enable == true) {
-    //     // initialize_mote();
-    //     config_ble_tx_mote();
-
-    //     // Initialize BLE TX.
-    //     printf("Initializing BLE TX.\n");
-    //     ble_init();
-    //     ble_init_tx();
-
-    //     // Configure the RF timer.
-    //     rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
-    //     rftimer_enable_interrupts();
-    //     rftimer_enable_interrupts_by_id(7);
-
-    //     analog_scan_chain_write();
-    //     analog_scan_chain_load();
-
-    //     crc_check();
-    //     // perform_calibration();
-    // }
-
-#if BLE_CALIBRATE_LC
-    // optical_vars.optical_cal_finished = false;
-    // optical_enableLCCalibration();
-
-    // does not worked,why?
-    synclight_cal_enableLCCalibration();
-    // this executed in radio_txEnable(), from perform_calibration(), I open it
-    // here.but I believe this included in 0x78 since 0110 and 0111
-    // ANALOG_CFG_REG__10 = 0x68;
-    // Turn on LO, DIV, PA, and IF
-    // move it below
-    // ANALOG_CFG_REG__10 = 0x78;
-
-    // Turn off polyphase and disable mixer
-    ANALOG_CFG_REG__16 = 0x6;
-
-    // For TX, LC target freq = 2.402G - 0.25M = 2.40175 GHz.
-    // optical_setLCTarget(250182);
-    synclight_cal_setLCTarget(250182);
-#endif
-    // printf("Config lighthouse mode\r\n");
-    // config_lighthouse_mote();
-    // Turn on LO, DIV, PA, and IF
-    // ANALOG_CFG_REG__10 = 0x78;
-    // analog_scan_chain_write();
-    // analog_scan_chain_load();
-    // Do not use perfom_calibration() here, it has radio_rxEnable() function,
-    // which will affect accuracy.
-
-    //  Enable optical SFD interrupt for optical calibration
-    // optical_enable();
-
-    // printf("Start synclight calibrating\r\n");
-    // ICER = 0xFFFF;
-    // Wait for optical cal to finish
-    // while (!optical_getCalibrationFinished());
-
-    // use inline function, this time should work.
-    // synclight_cal_enable_LC_calibration();
-
-    // printf("LC_CAL_ON GOING. enbable:%u,fininshed:%u \r\n",
-    //        synclight_cal_vars.optical_LC_cal_enable,
-    //        synclight_cal_vars.optical_LC_cal_finished);
-    // while (!synclight_cal_getCalibrationFinished()) {
-    //     decode_lighthouse();
-    // };
+    // how many times to transmite ble packets in single SENDING state
+    uint8_t counter_ble_tx = 10;
 
     // printf("Cal complete\r\n");
     if (sync_cal_ble_init_enable == true) {
@@ -1246,15 +1179,18 @@ static inline void state_sending(void) {
     // Generate a BLE packet.
     ble_generate_packet();
 
-    while (true) {  // counter_ble_tx
+    while (counter_ble_tx) {  // counter_ble_tx
         if (g_ble_tx_trigger) {
-            printf("Triggering BLE TX.\n");
+            printf("Triggering BLE TX. Remaining packet groups: %d\n",
+                   counter_ble_tx);
             ble_tx_trigger();
             g_ble_tx_trigger = false;
             delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
+            counter_ble_tx--;
         }
         // counter_ble_tx--;
     }
+    state_flags.ble_transmission_complete = true;
 }
 //=========================== main ============================================
 
