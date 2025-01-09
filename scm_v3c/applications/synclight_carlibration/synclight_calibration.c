@@ -203,7 +203,7 @@ sync_light_cal_Registers_t sync_cal_registers = {
 // If true, sweep through all fine codes.
 #define BLE_TX_SWEEP_FINE true
 //  #define BLE_TX_SWEEP_FINE false
-#define BLE_CALIBRATE_LC true
+#define BLE_CALIBRATE_LC false
 //  LC cal gives an optimal value, but we can decide whether use this.
 #define BLE_USE_OPTIMAL_LC true
 // BLE TX period in milliseconds.
@@ -491,7 +491,7 @@ void config_ble_tx_mote(void) {
     scm3c_hw_interface_init();
     optical_init();
     // a copy of optical_init
-    sync_light_calibrate_init();
+    // sync_light_calibrate_init();
     radio_init();
     rftimer_init();
     ble_init();
@@ -1127,7 +1127,7 @@ uint8_t counter_ble_tx;
 static inline void state_sending(void) {
     printf("State: BLE transimitting.\n");
     // enable/disable synclight calibration
-    sync_cal.need_sync_calibration = 1;
+    sync_cal.need_sync_calibration = 0;
     // now I use optical cal for debugging
     // gpio_ext8_state = OPTICAL_ISR;
     gpio_ext8_state = SYNC_LIGHT_ISR;
@@ -1176,34 +1176,34 @@ static inline void state_sending(void) {
     // optical_setLCTarget(250182);
     synclight_cal_setLCTarget(250182);
 #endif
-    printf("Config lighthouse mode\r\n");
-    config_lighthouse_mote();
+    // printf("Config lighthouse mode\r\n");
+    // config_lighthouse_mote();
     // Turn on LO, DIV, PA, and IF
-    ANALOG_CFG_REG__10 = 0x78;
-    analog_scan_chain_write();
-    analog_scan_chain_load();
+    // ANALOG_CFG_REG__10 = 0x78;
+    // analog_scan_chain_write();
+    // analog_scan_chain_load();
     // Do not use perfom_calibration() here, it has radio_rxEnable() function,
     // which will affect accuracy.
 
     //  Enable optical SFD interrupt for optical calibration
-    optical_enable();
+    // optical_enable();
 
-    printf("Start synclight calibrating\r\n");
-    ICER = 0xFFFF;
+    // printf("Start synclight calibrating\r\n");
+    // ICER = 0xFFFF;
     // Wait for optical cal to finish
     // while (!optical_getCalibrationFinished());
 
     // use inline function, this time should work.
-    synclight_cal_enable_LC_calibration();
+    // synclight_cal_enable_LC_calibration();
 
-    printf("LC_CAL_ON GOING. enbable:%u,fininshed:%u \r\n",
-           synclight_cal_vars.optical_LC_cal_enable,
-           synclight_cal_vars.optical_LC_cal_finished);
-    while (!synclight_cal_getCalibrationFinished()) {
-        decode_lighthouse();
-    };
+    // printf("LC_CAL_ON GOING. enbable:%u,fininshed:%u \r\n",
+    //        synclight_cal_vars.optical_LC_cal_enable,
+    //        synclight_cal_vars.optical_LC_cal_finished);
+    // while (!synclight_cal_getCalibrationFinished()) {
+    //     decode_lighthouse();
+    // };
 
-    printf("Cal complete\r\n");
+    // printf("Cal complete\r\n");
     if (sync_cal_ble_init_enable == true) {
         // initialize_mote();
         config_ble_tx_mote();
@@ -1227,6 +1227,8 @@ static inline void state_sending(void) {
 
     // Disable static divider to save power
     divProgram(480, 0, 0);
+    // set clock to optimal state
+    sync_light_calibrate_set_optimal_clocks();
 
     // Configure coarse, mid, and fine codes for TX.
 #if BLE_CALIBRATE_LC
@@ -1236,9 +1238,9 @@ static inline void state_sending(void) {
     g_ble_tx_tuning_code.fine = synclight_cal_vars.LC_fine_opt;
 #else
     // CHANGE THESE VALUES AFTER LC CALIBRATION.
-    app_vars.tx_coarse = 23;
-    app_vars.tx_mid = 11;
-    app_vars.tx_fine = 23;
+    g_ble_tx_tuning_code.coarse = synclight_cal_vars.LC_coarse_opt;
+    g_ble_tx_tuning_code.mid = synclight_cal_vars.LC_mid_opt;
+    g_ble_tx_tuning_code.fine = synclight_cal_vars.LC_fine_opt;
 #endif
 
     // Generate a BLE packet.
