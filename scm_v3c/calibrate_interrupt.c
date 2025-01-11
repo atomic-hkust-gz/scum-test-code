@@ -42,6 +42,8 @@ synclight_calibrate_vars_t synclight_cal_vars = {
     .coarseChange = false,
 };
 
+uint32_t asc_lighthouse[ASC_LEN];
+
 extern int8_t need_optical;
 //=========================== prototypes ======================================
 void calibration_isr() { printf("External Interrupt GPIO9 triggered\r\n"); }
@@ -823,6 +825,10 @@ void print_ASC(void) {
     }
     printf("--------------------------------\r\n");
 }
+
+void save_ASC_state(void) { scm3c_hw_interface_get_asc(asc_lighthouse); }
+
+void restore_ASC_state(void) { scm3c_hw_interface_set_asc(asc_lighthouse); }
 
 // this function use to test call calibration frenquency, so just some print.
 // use this in decode_lighthouse #600

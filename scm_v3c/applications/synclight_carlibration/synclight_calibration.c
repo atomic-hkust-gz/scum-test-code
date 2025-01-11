@@ -519,13 +519,13 @@ void config_ble_tx_mote(void) {
     // Enable passthrough on chip CLK divider
     set_asc_bit(41);
 
-    // Init counter setup - set all to analog_cfg control
+    // Init counter setup - set all to analog_cfg controlS
     // scm3c_hw_interface_vars.ASC[0] is leftmost
     // scm3c_hw_interface_vars.ASC[0] |= 0x6F800000;
     for (t = 2; t < 9; t++) set_asc_bit(t);
 
     // Init RX
-    radio_init_rx_MF();
+    // radio_init_rx_MF();
 
     // Init TX
     radio_init_tx();
@@ -1096,7 +1096,7 @@ static inline void state_sending(void) {
 
     // set this value to control how many times to transmitting
     // how many times to transmite ble packets in single SENDING state
-    uint8_t counter_ble_tx = 10;
+    uint8_t counter_ble_tx = 1;
 
     // printf("Cal complete\r\n");
     if (sync_cal_ble_init_enable == true) {
@@ -1200,6 +1200,8 @@ int main(void) {
         switch (scum_state) {
             case COLLECTING:
                 printf("State: Lighthouse Locating.\n");
+                // restore ASC state before collecting
+                restore_ASC_state();    
                 // disable synclight calibration
                 sync_cal.need_sync_calibration = 0;
                 state_optical_collecting();
@@ -1219,6 +1221,8 @@ int main(void) {
                 // parts? Is that essential?
                 sync_cal.need_sync_calibration = 1;
                 state_opt_calibrating();
+                // save ASC state after calibrating
+                save_ASC_state();
 
                 break;
 

@@ -88,7 +88,8 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
                                      uint32_t count_IF, uint32_t count_LC);
 void sync_light_calibrate_isr_placeholder(void);
 void sync_light_calibrate_set_optimal_clocks(void);
-
+void save_ASC_state(void);
+void restore_ASC_state(void);
 //=========================== private =========================================
 
 #endif
