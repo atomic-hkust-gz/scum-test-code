@@ -57,6 +57,13 @@ typedef struct {
     uint8_t IF_fine_opt;
 
 } synclight_calibrate_vars_t;
+
+typedef struct {
+    uint32_t lighthouse_clock[ASC_LEN];
+    uint32_t ble_clock[ASC_LEN];
+
+} asc_state_t;
+
 //=========================== prototypes ======================================
 
 //=========================== main ============================================
@@ -73,7 +80,6 @@ void synclight_cal_enable(void);
 void perform_synclight_calibration(void);
 // void optical_sfd_isr(void);
 
-
 void calibration_isr(void);
 void gpio_ext_3_interrupt_enable(void);
 void gpio_ext_3_interrupt_disable(void);
@@ -88,8 +94,8 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
                                      uint32_t count_IF, uint32_t count_LC);
 void sync_light_calibrate_isr_placeholder(void);
 void sync_light_calibrate_set_optimal_clocks(void);
-void save_ASC_state(void);
-void restore_ASC_state(void);
+void save_ASC_state(uint32_t* asc_state);
+void restore_ASC_state(uint32_t* asc_state);
 //=========================== private =========================================
 
 #endif

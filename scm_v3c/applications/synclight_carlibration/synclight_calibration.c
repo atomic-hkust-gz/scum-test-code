@@ -46,6 +46,7 @@ app_vars_t app_vars;
 
 extern optical_vars_t optical_vars;
 extern synclight_calibrate_vars_t synclight_cal_vars;
+extern asc_state_t asc_state;
 extern enum State_INTERRUPT_IO8 gpio_ext8_state;
 
 enum State {
@@ -519,7 +520,7 @@ void config_ble_tx_mote(void) {
     // Enable passthrough on chip CLK divider
     set_asc_bit(41);
 
-    // Init counter setup - set all to analog_cfg controlS
+    // Init counter setup - set all to analog_cfg control
     // scm3c_hw_interface_vars.ASC[0] is leftmost
     // scm3c_hw_interface_vars.ASC[0] |= 0x6F800000;
     for (t = 2; t < 9; t++) set_asc_bit(t);
@@ -1118,12 +1119,15 @@ static inline void state_sending(void) {
 
         crc_check();
         // perform_calibration();
+        save_ASC_state(asc_state.ble_clock);
     }
 
     // Disable static divider to save power
     divProgram(480, 0, 0);
     // set clock to optimal state
     sync_light_calibrate_set_optimal_clocks();
+    // see the ASC value after set clock to optimal state
+    print_ASC();
 
     // Configure coarse, mid, and fine codes for TX.
 #if BLE_CALIBRATE_LC
@@ -1201,7 +1205,7 @@ int main(void) {
             case COLLECTING:
                 printf("State: Lighthouse Locating.\n");
                 // restore ASC state before collecting
-                restore_ASC_state();    
+                restore_ASC_state(asc_state.lighthouse_clock);    
                 // disable synclight calibration
                 sync_cal.need_sync_calibration = 0;
                 state_optical_collecting();
@@ -1222,7 +1226,7 @@ int main(void) {
                 sync_cal.need_sync_calibration = 1;
                 state_opt_calibrating();
                 // save ASC state after calibrating
-                save_ASC_state();
+                save_ASC_state(asc_state.lighthouse_clock);
 
                 break;
 
@@ -1244,7 +1248,7 @@ int main(void) {
                 state_flags.ble_packet_ready = true;
                 break;
             case SENDING:
-                printf("State: BLE transimitting.\n");
+                printf("State: BLE transimitting.\n"); 
                 state_sending();
                 break;
             case DEFAULT:
