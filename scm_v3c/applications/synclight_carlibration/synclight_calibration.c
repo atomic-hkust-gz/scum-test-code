@@ -6,6 +6,7 @@
 #include "calibrate_interrupt.h"
 #include "gpio.h"
 #include "lighthouse_position.h"
+#include "lighthouse_ptc.h"
 #include "memory_map.h"
 #include "optical.h"
 #include "radio.h"
@@ -45,6 +46,7 @@ app_vars_t app_vars;
 
 extern optical_vars_t optical_vars;
 extern synclight_calibrate_vars_t synclight_cal_vars;
+extern asc_state_t asc_state;
 extern enum State_INTERRUPT_IO8 gpio_ext8_state;
 
 enum State {
@@ -110,45 +112,6 @@ sync_light_calibration_t sync_cal = {.count_sync_light = 0,
                                      .counter_localization = 0,
                                      .counter_lighthouse_state_period = 20,
                                      .counter_global_timer = 0};
-// indicate the type of light
-enum Lighthouse_light_type {
-    // duration longer than 50ms
-    sync_light,
-    // duration shorter than 30ms(usually 15ms)
-    sweep_light,
-    // duration longer than 100ms
-    sync_skip_light
-
-};
-typedef struct {
-    // Variables for lighthouse RX, store OPTICAL_DATA_RAW pin state
-    unsigned short current_gpio, last_gpio, state, nextstate, pulse_type;
-    unsigned int timestamp_rise, timestamp_fall, pulse_width;
-    // variables from lighthouse tracking repo
-    uint32_t t_0_start;
-    uint32_t t_0_end;
-    uint32_t t_opt_pulse;
-    uint32_t t_opt_pulse_us;
-    uint32_t t_1_start;
-    uint32_t t_d_start;
-    uint8_t flag_start;
-    // sync;sweep;skip_sync
-    enum Lighthouse_light_type flag_light_type;
-    // after a sweep, wo is the first which is the station A
-    uint8_t flag_station;
-    // 0：NULL,1:A,2:B
-    uint8_t flag_A_station;
-    uint32_t loca_duration;
-    uint8_t loca_x;
-    // angle x output from lighthouse station A
-    uint32_t A_X;
-    // angle y output from lighthouse station A
-    uint32_t A_Y;
-    // angle x output from lighthouse station B
-    uint32_t B_X;
-    // angle y output from lighthouse station B
-    uint32_t B_Y;
-} ligththouse_protocal_t;
 
 ligththouse_protocal_t lighthouse_ptc = {.current_gpio = 0,
                                          .last_gpio = 0,
@@ -563,7 +526,7 @@ void config_ble_tx_mote(void) {
     for (t = 2; t < 9; t++) set_asc_bit(t);
 
     // Init RX
-    radio_init_rx_MF();
+    // radio_init_rx_MF();
 
     // Init TX
     radio_init_tx();
@@ -1134,7 +1097,7 @@ static inline void state_sending(void) {
 
     // set this value to control how many times to transmitting
     // how many times to transmite ble packets in single SENDING state
-    uint8_t counter_ble_tx = 10;
+    uint8_t counter_ble_tx = 1;
 
     // printf("Cal complete\r\n");
     if (sync_cal_ble_init_enable == true) {
@@ -1156,12 +1119,15 @@ static inline void state_sending(void) {
 
         crc_check();
         // perform_calibration();
+        save_ASC_state(asc_state.ble_clock);
     }
 
     // Disable static divider to save power
     divProgram(480, 0, 0);
     // set clock to optimal state
     sync_light_calibrate_set_optimal_clocks();
+    // see the ASC value after set clock to optimal state
+    print_ASC();
 
     // Configure coarse, mid, and fine codes for TX.
 #if BLE_CALIBRATE_LC
@@ -1238,6 +1204,8 @@ int main(void) {
         switch (scum_state) {
             case COLLECTING:
                 printf("State: Lighthouse Locating.\n");
+                // restore ASC state before collecting
+                restore_ASC_state(asc_state.lighthouse_clock);    
                 // disable synclight calibration
                 sync_cal.need_sync_calibration = 0;
                 state_optical_collecting();
@@ -1257,6 +1225,8 @@ int main(void) {
                 // parts? Is that essential?
                 sync_cal.need_sync_calibration = 1;
                 state_opt_calibrating();
+                // save ASC state after calibrating
+                save_ASC_state(asc_state.lighthouse_clock);
 
                 break;
 
@@ -1278,7 +1248,7 @@ int main(void) {
                 state_flags.ble_packet_ready = true;
                 break;
             case SENDING:
-                printf("State: BLE transimitting.\n");
+                printf("State: BLE transimitting.\n"); 
                 state_sending();
                 break;
             case DEFAULT:

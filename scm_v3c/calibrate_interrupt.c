@@ -42,6 +42,8 @@ synclight_calibrate_vars_t synclight_cal_vars = {
     .coarseChange = false,
 };
 
+asc_state_t asc_state = {.lighthouse_clock = {0}, .ble_clock = {0}};
+
 extern int8_t need_optical;
 //=========================== prototypes ======================================
 void calibration_isr() { printf("External Interrupt GPIO9 triggered\r\n"); }
@@ -822,6 +824,18 @@ void print_ASC(void) {
         }
     }
     printf("--------------------------------\r\n");
+}
+
+void save_ASC_state(uint32_t* asc_state) {
+    if (asc_state != NULL) {
+        scm3c_hw_interface_get_asc(asc_state);
+    }
+}
+
+void restore_ASC_state(uint32_t* asc_state) {
+    if (asc_state != NULL) {
+        scm3c_hw_interface_set_asc(asc_state);
+    }
 }
 
 // this function use to test call calibration frenquency, so just some print.
