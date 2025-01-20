@@ -48,6 +48,7 @@ extern optical_vars_t optical_vars;
 extern synclight_calibrate_vars_t synclight_cal_vars;
 extern asc_state_t asc_state;
 extern enum State_INTERRUPT_IO8 gpio_ext8_state;
+extern ble_vars_t ble_vars;
 
 enum State {
     // this state, reserved for debugging
@@ -1084,6 +1085,13 @@ static inline void state_opt_calibrating(void) {
     }
 }
 
+static inline void state_BLE_Adv_packet_with_location_generation(void) {
+    ble_init();
+    ble_vars.location_x = lighthouse_ptc.A_X;
+    ble_vars.location_y = lighthouse_ptc.A_Y;
+    ble_generate_location_packet();
+}
+
 // I guess it does not need init each sending state
 bool sync_cal_ble_init_enable = true;
 
@@ -1143,7 +1151,8 @@ static inline void state_sending(void) {
 #endif
 
     // Generate a BLE packet.
-    ble_generate_packet();
+    // ble_generate_packet();
+    ble_generate_location_packet();
 
     while (counter_ble_tx) {  // counter_ble_tx
         if (g_ble_tx_trigger) {
@@ -1243,8 +1252,7 @@ int main(void) {
                 // fuction, I think it does not need to be an individual state,
                 // but in this way will be clearly
                 sync_cal.need_sync_calibration = 0;
-                ble_init();
-                ble_generate_location_packet();
+                state_BLE_Adv_packet_with_location_generation();
                 state_flags.ble_packet_ready = true;
                 break;
             case SENDING:

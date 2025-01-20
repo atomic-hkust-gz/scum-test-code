@@ -10,30 +10,6 @@
 #include "scm3c_hw_interface.h"
 #include "tuning.h"
 
-typedef struct {
-    uint8_t packet[BLE_MAX_PACKET_LENGTH];
-    uint8_t advertiser_address[BLE_ADVERTISER_ADDRESS_LENGTH];
-    uint8_t channel;
-
-    // BLE packet contents enable.
-    // The total data length cannot exceed 31 bytes.
-    bool name_tx_en;
-    bool tuning_code_tx_en;
-    bool counters_tx_en;
-    bool temperature_tx_en;
-    bool data_tx_en;
-    bool appearance_en;
-
-    // BLE packet data.
-    char name[BLE_SHORT_NAME_LENGTH];
-    tuning_code_t tuning_code;
-    uint8_t appearance[BLE_GAP_APPEARANCE_LENGTH];
-    uint32_t count_2M;
-    uint32_t count_32k;
-    double temperature;
-    uint8_t data[BLE_CUSTOM_DATA_LENGTH];
-} ble_vars_t;
-
 ble_vars_t ble_vars;
 
 static inline void ble_load_tx_arb_fifo(void) {
@@ -126,8 +102,9 @@ void ble_init(void) {
     ble_vars.appearance[1] = 0x03;
 
     ble_vars.tuning_code_tx_en = true;
-    ble_vars.counters_tx_en = true;
-    ble_vars.temperature_tx_en = true;
+    // ble_vars.counters_tx_en = true;
+    // ble_vars.temperature_tx_en = true;
+    ble_vars.location_en = true;
     // ble_vars.data_tx_en = true;
 }
 
@@ -319,22 +296,23 @@ void ble_generate_location_packet(void) {
             flipChar((tuning_code >> 8) & 0xFF);      // LC freq codes MSB
         pdu_crc[j++] = flipChar(tuning_code & 0xFF);  // LC freq codes LSB
     }
-
-    if (ble_vars.counters_tx_en) {
-        pdu_crc[j++] = BLE_COUNTERS_HEADER;
-        pdu_crc[j++] = BLE_COUNTERS_GAP_CODE;
-
-        pdu_crc[j++] =
-            flipChar((ble_vars.count_2M >> 24) & 0xFF);  // count_2M MSB
-        pdu_crc[j++] = flipChar((ble_vars.count_2M >> 16) & 0xFF);
-        pdu_crc[j++] = flipChar((ble_vars.count_2M >> 8) & 0xFF);
-        pdu_crc[j++] = flipChar(ble_vars.count_2M & 0xFF);  // count_2M LSB
+    // counter has 2 32bit value, I use this so donot need generate new gap code
+    // or header
+    if (ble_vars.location_en) {
+        pdu_crc[j++] = BLE_LOCATION_DATA_HEADER;
+        pdu_crc[j++] = BLE_LOCATION_DATA_GAP_CODE;
 
         pdu_crc[j++] =
-            flipChar((ble_vars.count_32k >> 24) & 0xFF);  // count_32k MSB
-        pdu_crc[j++] = flipChar((ble_vars.count_32k >> 16) & 0xFF);
-        pdu_crc[j++] = flipChar((ble_vars.count_32k >> 8) & 0xFF);
-        pdu_crc[j++] = flipChar(ble_vars.count_32k & 0xFF);  // count_32k LSB
+            flipChar((ble_vars.location_x >> 24) & 0xFF);  // location_x MSB
+        pdu_crc[j++] = flipChar((ble_vars.location_x >> 16) & 0xFF);
+        pdu_crc[j++] = flipChar((ble_vars.location_x >> 8) & 0xFF);
+        pdu_crc[j++] = flipChar(ble_vars.location_x & 0xFF);  // location_x LSB
+
+        pdu_crc[j++] =
+            flipChar((ble_vars.location_y >> 24) & 0xFF);  // location_y MSB
+        pdu_crc[j++] = flipChar((ble_vars.location_y >> 16) & 0xFF);
+        pdu_crc[j++] = flipChar((ble_vars.location_y >> 8) & 0xFF);
+        pdu_crc[j++] = flipChar(ble_vars.location_y & 0xFF);  // location_y LSB
     }
 
     if (ble_vars.temperature_tx_en) {

@@ -61,6 +61,12 @@
 // Custom GAP code for custom data (0xC3 LSB first).
 #define BLE_CUSTOM_DATA_GAP_CODE 0xC3
 
+// location data
+#define BLE_LOCATION_DATA_LENGTH 8
+#define BLE_LOCATION_DATA_HEADER 0x90
+// custom GAP code for location data (0xC4 LSB first).
+#define BLE_LOCATION_DATA_GAP_CODE 0x23
+
 // BLE advertiser address.
 #define BLE_ADVERTISER_ADDRESS_LENGTH 6
 // BLE protocol data unit length (2 bytes PDU header + 37 bytes PDU).
@@ -70,6 +76,33 @@
 
 // Maximum BLE packet length.
 #define BLE_MAX_PACKET_LENGTH 64
+
+typedef struct {
+    uint8_t packet[BLE_MAX_PACKET_LENGTH];
+    uint8_t advertiser_address[BLE_ADVERTISER_ADDRESS_LENGTH];
+    uint8_t channel;
+
+    // BLE packet contents enable.
+    // The total data length cannot exceed 31 bytes.
+    bool name_tx_en;
+    bool tuning_code_tx_en;
+    bool counters_tx_en;
+    bool temperature_tx_en;
+    bool data_tx_en;
+    bool appearance_en;
+    bool location_en;
+
+    // BLE packet data.
+    char name[BLE_SHORT_NAME_LENGTH];
+    tuning_code_t tuning_code;
+    uint8_t appearance[BLE_GAP_APPEARANCE_LENGTH];
+    uint32_t count_2M;
+    uint32_t count_32k;
+    double temperature;
+    uint8_t data[BLE_CUSTOM_DATA_LENGTH];
+    uint32_t location_x;
+    uint32_t location_y;
+} ble_vars_t;
 
 // Initialize BLE.
 void ble_init(void);
