@@ -1011,6 +1011,9 @@ static inline void state_optical_collecting(void) {
                    lighthouse_ptc.A_Y, lighthouse_ptc.B_X, lighthouse_ptc.B_Y);
             printf("Remaining packets: %d\n", sync_cal.counter_localization);
             sync_cal.counter_localization--;
+            // save location to packet, should find a better way, not in this function.
+            // ble_vars.location_x = lighthouse_ptc.A_X;
+            // ble_vars.location_y = lighthouse_ptc.A_Y;
         }
     }
     //      wait some time then print to uart
@@ -1087,6 +1090,7 @@ static inline void state_opt_calibrating(void) {
 
 static inline void state_BLE_Adv_packet_with_location_generation(void) {
     ble_init();
+    memset(&ble_vars, 0, sizeof(ble_vars));
     ble_vars.location_x = lighthouse_ptc.A_X;
     ble_vars.location_y = lighthouse_ptc.A_Y;
     ble_generate_location_packet();
@@ -1214,7 +1218,7 @@ int main(void) {
             case COLLECTING:
                 printf("State: Lighthouse Locating.\n");
                 // restore ASC state before collecting
-                restore_ASC_state(asc_state.lighthouse_clock);    
+                restore_ASC_state(asc_state.lighthouse_clock);
                 // disable synclight calibration
                 sync_cal.need_sync_calibration = 0;
                 state_optical_collecting();
@@ -1256,7 +1260,7 @@ int main(void) {
                 state_flags.ble_packet_ready = true;
                 break;
             case SENDING:
-                printf("State: BLE transimitting.\n"); 
+                printf("State: BLE transimitting.\n");
                 state_sending();
                 break;
             case DEFAULT:

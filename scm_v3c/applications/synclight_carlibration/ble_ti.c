@@ -75,7 +75,7 @@ static inline void ble_transmit_tx_arb_fifo(void) {
 
 void ble_init(void) {
     // Clear variables.
-    memset(&ble_vars, 0, sizeof(ble_vars));
+    // memset(&ble_vars, 0, sizeof(ble_vars));
 
     // Set default advertiser address.
     ble_vars.advertiser_address[0] = 0x00;
@@ -101,7 +101,7 @@ void ble_init(void) {
     ble_vars.appearance[0] = 0xc2;
     ble_vars.appearance[1] = 0x03;
 
-    ble_vars.tuning_code_tx_en = true;
+    // ble_vars.tuning_code_tx_en = true;
     // ble_vars.counters_tx_en = true;
     // ble_vars.temperature_tx_en = true;
     ble_vars.location_en = true;
