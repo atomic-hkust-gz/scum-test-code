@@ -609,7 +609,7 @@ void sync_light_calibrate_all_clocks(uint32_t count_HFclock, uint32_t count_2M,
                             // LC_diff?
                             if ((synclight_cal_vars.cal_LC_coarse >
                                  LC_CAL_COARSE_MAX) ||
-                                (real_LC_diff < 100)) {
+                                (real_LC_diff < MIN_LC_DIFF)) {
                                 synclight_cal_vars.optical_LC_cal_finished =
                                     true;
                                 printf("coarse: %u, mid: %u, fine: %u\n",

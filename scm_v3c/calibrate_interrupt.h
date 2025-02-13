@@ -14,7 +14,7 @@
 #define LC_CAL_MID_MAX 31
 #define LC_CAL_FINE_MIN 15
 #define LC_CAL_FINE_MAX 15
-#define MIN_LC_DIFF 100
+#define MIN_LC_DIFF 160  // can be 100 for strict equal, can be adjusted
 //=========================== variables =======================================
 typedef struct {
     uint8_t optical_cal_iteration;
