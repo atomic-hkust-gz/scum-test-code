@@ -844,7 +844,8 @@ void sync_light_calibrate_isr_placeholder(void) {
     //    int32_t t;
     uint32_t rdata_lsb, rdata_msb;
     int32_t count_LC;
-    uint32_t count_32k, count_2M, count_HFclock, count_IF;
+    uint32_t count_32k;
+    uint32_t count_2M, count_HFclock, count_IF;
     // a new LC_diff to replace the struct variable one
     // (synclight_cal_vars.cal_LC_diff).
     int32_t real_LC_diff;
@@ -857,7 +858,7 @@ void sync_light_calibrate_isr_placeholder(void) {
     uint32_t IF_coarse;
     uint32_t IF_fine;
 
-    int32_t tmp_countLC, tmp_LC_target;
+    // int32_t tmp_countLC, tmp_LC_target;
 
     HF_CLOCK_fine = scm3c_hw_interface_get_HF_CLOCK_fine();
     HF_CLOCK_coarse = scm3c_hw_interface_get_HF_CLOCK_coarse();

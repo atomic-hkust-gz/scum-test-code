@@ -1077,7 +1077,7 @@ static inline void state_opt_calibrating(void) {
     // this line only used for enable LC
     radio_txEnable();
     //  control delay time.
-    int8_t ticks = 1000;
+    int16_t ticks = 1000;
     while (!synclight_cal_vars.optical_LC_cal_finished) {
         // a little delay for debug, can be removed.
         while (ticks) {
