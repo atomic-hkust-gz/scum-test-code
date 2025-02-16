@@ -48,6 +48,7 @@ extern optical_vars_t optical_vars;
 extern synclight_calibrate_vars_t synclight_cal_vars;
 extern asc_state_t asc_state;
 extern enum State_INTERRUPT_IO8 gpio_ext8_state;
+extern ble_vars_t ble_vars;
 
 enum State {
     // this state, reserved for debugging
@@ -1010,6 +1011,9 @@ static inline void state_optical_collecting(void) {
                    lighthouse_ptc.A_Y, lighthouse_ptc.B_X, lighthouse_ptc.B_Y);
             printf("Remaining packets: %d\n", sync_cal.counter_localization);
             sync_cal.counter_localization--;
+            // save location to packet, should find a better way, not in this function.
+            // ble_vars.location_x = lighthouse_ptc.A_X;
+            // ble_vars.location_y = lighthouse_ptc.A_Y;
         }
     }
     //      wait some time then print to uart
@@ -1073,7 +1077,7 @@ static inline void state_opt_calibrating(void) {
     // this line only used for enable LC
     radio_txEnable();
     //  control delay time.
-    int8_t ticks = 1000;
+    int16_t ticks = 1000;
     while (!synclight_cal_vars.optical_LC_cal_finished) {
         // a little delay for debug, can be removed.
         while (ticks) {
@@ -1082,6 +1086,14 @@ static inline void state_opt_calibrating(void) {
         // keep read lighthouse to get light.
         decode_lighthouse();
     }
+}
+
+static inline void state_BLE_Adv_packet_with_location_generation(void) {
+    ble_init();
+    memset(&ble_vars, 0, sizeof(ble_vars));
+    ble_vars.location_x = lighthouse_ptc.A_X;
+    ble_vars.location_y = lighthouse_ptc.A_Y;
+    ble_generate_location_packet();
 }
 
 // I guess it does not need init each sending state
@@ -1143,7 +1155,8 @@ static inline void state_sending(void) {
 #endif
 
     // Generate a BLE packet.
-    ble_generate_packet();
+    // ble_generate_packet();
+    ble_generate_location_packet();
 
     while (counter_ble_tx) {  // counter_ble_tx
         if (g_ble_tx_trigger) {
@@ -1205,7 +1218,7 @@ int main(void) {
             case COLLECTING:
                 printf("State: Lighthouse Locating.\n");
                 // restore ASC state before collecting
-                restore_ASC_state(asc_state.lighthouse_clock);    
+                restore_ASC_state(asc_state.lighthouse_clock);
                 // disable synclight calibration
                 sync_cal.need_sync_calibration = 0;
                 state_optical_collecting();
@@ -1243,12 +1256,11 @@ int main(void) {
                 // fuction, I think it does not need to be an individual state,
                 // but in this way will be clearly
                 sync_cal.need_sync_calibration = 0;
-                ble_init();
-                ble_generate_location_packet();
+                state_BLE_Adv_packet_with_location_generation();
                 state_flags.ble_packet_ready = true;
                 break;
             case SENDING:
-                printf("State: BLE transimitting.\n"); 
+                printf("State: BLE transimitting.\n");
                 state_sending();
                 break;
             case DEFAULT:
