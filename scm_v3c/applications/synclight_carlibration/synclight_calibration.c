@@ -102,6 +102,8 @@ typedef struct {
     uint32_t counter_lighthouse_state_period;
     // to be a individual timer for recording time.
     uint32_t counter_global_timer;
+    // indicate how many BLE packet has been transmitted
+    uint16_t counter_ble_tx_pkt;
 } sync_light_calibration_t;
 
 sync_light_calibration_t sync_cal = {.count_sync_light = 0,
@@ -112,7 +114,8 @@ sync_light_calibration_t sync_cal = {.count_sync_light = 0,
                                      .count_calibration = 0,
                                      .counter_localization = 0,
                                      .counter_lighthouse_state_period = 20,
-                                     .counter_global_timer = 0};
+                                     .counter_global_timer = 0,
+                                     .counter_ble_tx_pkt = 0};
 
 ligththouse_protocal_t lighthouse_ptc = {.current_gpio = 0,
                                          .last_gpio = 0,
@@ -197,8 +200,10 @@ static inline void ble_tx_trigger(void) {
         ble_vars.tuning_code.coarse = g_ble_tx_tuning_code.coarse;
         ble_vars.tuning_code.mid = g_ble_tx_tuning_code.mid;
         ble_vars.tuning_code.fine = g_ble_tx_tuning_code.fine;
-        printf("give BLE packet on %u.%u.%u.\n", ble_vars.tuning_code.coarse,
-               ble_vars.tuning_code.mid, ble_vars.tuning_code.fine);
+        // increase counter to indicate how many BLE packet has been
+        // transmitted
+        sync_cal.counter_ble_tx_pkt++;
+        ble_vars.tx_pkt_counter = sync_cal.counter_ble_tx_pkt;
 
         // need generate pkt again
         ble_generate_location_packet();
@@ -1219,6 +1224,8 @@ int main(void) {
     // is 500KHz, interrupt per 1s(1000ms)
     //  here is the timecounter to control print velocity
     sync_cal.counter_global_timer = 0;
+    // indicate how many BLE packet has been transmitted
+    sync_cal.counter_ble_tx_pkt = 0;
     sync_cal.counter_localization = sync_cal.counter_lighthouse_state_period;
     scum_state = DEFAULT;
     while (1) {

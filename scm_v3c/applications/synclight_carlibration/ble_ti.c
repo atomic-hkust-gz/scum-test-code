@@ -10,7 +10,7 @@
 #include "scm3c_hw_interface.h"
 #include "tuning.h"
 
-ble_vars_t ble_vars;
+ble_vars_t ble_vars = {.tx_pkt_counter = 0};
 
 static inline void ble_load_tx_arb_fifo(void) {
     // Initialize variables.
@@ -103,6 +103,7 @@ void ble_init(void) {
 
     ble_vars.location_en = true;
     ble_vars.tuning_code_mid_fine_tx_en = true;
+    ble_vars.counter_tx_pkt_en = true;
     // ble_vars.counters_tx_en = true;
     // ble_vars.temperature_tx_en = true;
     // ble_vars.data_tx_en = true;
@@ -344,6 +345,16 @@ void ble_generate_location_packet(void) {
         for (k = 0; k < BLE_GAP_APPEARANCE_LENGTH; ++k) {
             pdu_crc[j++] = flipChar(ble_vars.appearance[k]);
         }
+    }
+
+    if (ble_vars.counter_tx_pkt_en) {  // 添加使能标志
+        pdu_crc[j++] = BLE_COUNTER_HEADER;
+        pdu_crc[j++] = BLE_COUNTER_GAP_CODE;
+
+        // 高字节在前，低字节在后
+        pdu_crc[j++] =
+            flipChar((ble_vars.tx_pkt_counter >> 8) & 0xFF);      // 高字节
+        pdu_crc[j++] = flipChar(ble_vars.tx_pkt_counter & 0xFF);  // 低字节
     }
 
     for (j = 0; j < BLE_PDU_LENGTH; ++j) {
