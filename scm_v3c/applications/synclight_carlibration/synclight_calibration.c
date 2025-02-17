@@ -193,6 +193,15 @@ static inline void ble_tx_trigger(void) {
         printf("Transmitting BLE packet on %u.%u.%u.\n",
                g_ble_tx_tuning_code.coarse, g_ble_tx_tuning_code.mid,
                g_ble_tx_tuning_code.fine);
+        // give tunning code data to pkt
+        ble_vars.tuning_code.coarse = g_ble_tx_tuning_code.coarse;
+        ble_vars.tuning_code.mid = g_ble_tx_tuning_code.mid;
+        ble_vars.tuning_code.fine = g_ble_tx_tuning_code.fine;
+        printf("give BLE packet on %u.%u.%u.\n", ble_vars.tuning_code.coarse,
+               ble_vars.tuning_code.mid, ble_vars.tuning_code.fine);
+
+        // need generate pkt again
+        ble_generate_location_packet();
 
         // Wait for the frequency to settle.
         for (uint32_t t = 0; t < 5000; ++t);
@@ -1011,8 +1020,8 @@ static inline void state_optical_collecting(void) {
                    lighthouse_ptc.A_Y, lighthouse_ptc.B_X, lighthouse_ptc.B_Y);
             printf("Remaining packets: %d\n", sync_cal.counter_localization);
             sync_cal.counter_localization--;
-            // save location to packet, should find a better way, not in this function.
-            // ble_vars.location_x = lighthouse_ptc.A_X;
+            // save location to packet, should find a better way, not in this
+            // function. ble_vars.location_x = lighthouse_ptc.A_X;
             // ble_vars.location_y = lighthouse_ptc.A_Y;
         }
     }

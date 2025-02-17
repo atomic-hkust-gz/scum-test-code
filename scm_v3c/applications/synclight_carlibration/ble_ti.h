@@ -67,6 +67,13 @@
 // custom GAP code for location data (0xC4 LSB first).
 #define BLE_LOCATION_DATA_GAP_CODE 0x23
 
+// Tuning code but mid/fine only.
+#define BLE_TUNING_CODE_MID_FINE_LENGTH 2
+// The tuning code is 3 bytes long (1 byte GAP code + 2 bytes data).
+#define BLE_TUNING_CODE_MID_FINE_HEADER 0xC0
+// Customn GAP code for the tuning code (0xC5 LSB first).
+#define BLE_TUNING_CODE_MID_FINE_GAP_CODE 0xA3
+
 // BLE advertiser address.
 #define BLE_ADVERTISER_ADDRESS_LENGTH 6
 // BLE protocol data unit length (2 bytes PDU header + 37 bytes PDU).
@@ -90,7 +97,9 @@ typedef struct {
     bool temperature_tx_en;
     bool data_tx_en;
     bool appearance_en;
+
     bool location_en;
+    bool tuning_code_mid_fine_tx_en;
 
     // BLE packet data.
     char name[BLE_SHORT_NAME_LENGTH];
