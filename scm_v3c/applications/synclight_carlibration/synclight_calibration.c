@@ -75,12 +75,14 @@ typedef struct {
     bool ble_transmission_complete;
     uint32_t state_timeout_counter;
     uint8_t state_retry_count;
+    bool ble_TX_TEST_IS_ON;
 } state_machine_flags_t;
 
 state_machine_flags_t state_flags = {.ble_packet_ready = false,
                                      .ble_transmission_complete = false,
                                      .state_timeout_counter = 0,
-                                     .state_retry_count = 0};
+                                     .state_retry_count = 0,
+                                     .ble_TX_TEST_IS_ON = true};
 
 typedef struct {
     // store synclight then call synclight calibration
@@ -168,7 +170,7 @@ sync_light_cal_Registers_t sync_cal_registers = {
 // ble variables from ble_tx_ti.c
 /************************************************************************ */
 // If true, sweep through all fine codes.
-#define BLE_TX_SWEEP_FINE true
+#define BLE_TX_SWEEP_FINE false
 //  #define BLE_TX_SWEEP_FINE false
 #define BLE_CALIBRATE_LC false
 //  LC cal gives an optimal value, but we can decide whether use this.
@@ -214,15 +216,31 @@ static inline void ble_tx_trigger(void) {
         ble_transmit();
     }
 #else   // !BLE_TX_SWEEP_FINE
-    tuning_tune_radio(&g_ble_tx_tuning_code);
-    printf("Transmitting BLE packet on %u.%u.%u.\n",
-           g_ble_tx_tuning_code.coarse, g_ble_tx_tuning_code.mid,
-           g_ble_tx_tuning_code.fine);
+    // use fixed fine code to do PDR test
+    g_ble_tx_tuning_code.fine = 11;
+    // each period send 20 pkts
+    for (uint8_t t = 0; t < 20; ++t) {
+        tuning_tune_radio(&g_ble_tx_tuning_code);
+        printf("Transmitting BLE packet on %u.%u.%u.\n",
+               g_ble_tx_tuning_code.coarse, g_ble_tx_tuning_code.mid,
+               g_ble_tx_tuning_code.fine);
+        // give tunning code data to pkt
+        ble_vars.tuning_code.coarse = g_ble_tx_tuning_code.coarse;
+        ble_vars.tuning_code.mid = g_ble_tx_tuning_code.mid;
+        ble_vars.tuning_code.fine = g_ble_tx_tuning_code.fine;
+        // increase counter to indicate how many BLE packet has been
+        // transmitted
+        sync_cal.counter_ble_tx_pkt++;
+        ble_vars.tx_pkt_counter = sync_cal.counter_ble_tx_pkt;
 
-    // Wait for frequency to settle.
-    for (uint32_t t = 0; t < 5000; ++t);
+        // need generate pkt again
+        ble_generate_location_packet();
 
-    ble_transmit();
+        // Wait for the frequency to settle.
+        for (uint32_t t = 0; t < 5000; ++t);
+
+        ble_transmit();
+    }
 #endif  // BLE_TX_SWEEP_FINE
 }
 
@@ -968,8 +986,9 @@ static void update_state(enum State current_state) {
 
         case SENDING:
             // 发送完成后可以回到采集状态继续新的循环
-            if (state_flags
-                    .ble_transmission_complete) {  // 需要添加一个标志位表示发送完成
+            if (state_flags.ble_transmission_complete &&
+                (!state_flags
+                      .ble_TX_TEST_IS_ON)) {  // 需要添加一个标志位表示发送完成
                 scum_state = COLLECTING;
                 // 重置采集计时器
                 sync_cal.counter_localization =
@@ -1172,17 +1191,18 @@ static inline void state_sending(void) {
     // ble_generate_packet();
     ble_generate_location_packet();
 
-    while (counter_ble_tx) {  // counter_ble_tx
+    while (1) {  // counter_ble_tx
         if (g_ble_tx_trigger) {
             printf("Triggering BLE TX. Remaining packet groups: %d\n",
                    counter_ble_tx);
             ble_tx_trigger();
             g_ble_tx_trigger = false;
             delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
-            counter_ble_tx--;
+            // counter_ble_tx--;
         }
         // counter_ble_tx--;
     }
+    // once TX is completed, set flag then use it in update_state()
     state_flags.ble_transmission_complete = true;
 }
 //=========================== main ============================================
@@ -1228,6 +1248,10 @@ int main(void) {
     sync_cal.counter_ble_tx_pkt = 0;
     sync_cal.counter_localization = sync_cal.counter_lighthouse_state_period;
     scum_state = DEFAULT;
+
+    // open ble tx test mode, which will continous send pkts
+    state_flags.ble_TX_TEST_IS_ON = true;
+
     while (1) {
         update_state(scum_state);
         switch (scum_state) {
