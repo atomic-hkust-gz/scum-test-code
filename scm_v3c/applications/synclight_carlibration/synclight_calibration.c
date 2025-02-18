@@ -217,7 +217,7 @@ static inline void ble_tx_trigger(void) {
     }
 #else   // !BLE_TX_SWEEP_FINE
     // use fixed fine code to do PDR test
-    g_ble_tx_tuning_code.fine = 11;
+    g_ble_tx_tuning_code.fine = 9;
     // each period send 20 pkts
     for (uint8_t t = 0; t < 20; ++t) {
         tuning_tune_radio(&g_ble_tx_tuning_code);
