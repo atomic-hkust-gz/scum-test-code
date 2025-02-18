@@ -10,7 +10,7 @@
 #include "scm3c_hw_interface.h"
 #include "tuning.h"
 
-ble_vars_t ble_vars;
+ble_vars_t ble_vars = {.tx_pkt_counter = 0};
 
 static inline void ble_load_tx_arb_fifo(void) {
     // Initialize variables.
@@ -101,10 +101,11 @@ void ble_init(void) {
     ble_vars.appearance[0] = 0xc2;
     ble_vars.appearance[1] = 0x03;
 
-    // ble_vars.tuning_code_tx_en = true;
+    ble_vars.location_en = true;
+    ble_vars.tuning_code_mid_fine_tx_en = true;
+    ble_vars.counter_tx_pkt_en = true;
     // ble_vars.counters_tx_en = true;
     // ble_vars.temperature_tx_en = true;
-    ble_vars.location_en = true;
     // ble_vars.data_tx_en = true;
 }
 
@@ -284,18 +285,6 @@ void ble_generate_location_packet(void) {
             pdu_crc[j++] = flipChar(ble_vars.name[k]);
         }
     }
-
-    if (ble_vars.tuning_code_tx_en) {
-        pdu_crc[j++] = BLE_TUNING_CODE_HEADER;
-        pdu_crc[j++] = BLE_TUNING_CODE_GAP_CODE;
-
-        const uint16_t tuning_code = (ble_vars.tuning_code.coarse << 10) |
-                                     (ble_vars.tuning_code.mid << 5) |
-                                     ble_vars.tuning_code.fine;
-        pdu_crc[j++] =
-            flipChar((tuning_code >> 8) & 0xFF);      // LC freq codes MSB
-        pdu_crc[j++] = flipChar(tuning_code & 0xFF);  // LC freq codes LSB
-    }
     // counter has 2 32bit value, I use this so donot need generate new gap code
     // or header
     if (ble_vars.location_en) {
@@ -313,6 +302,17 @@ void ble_generate_location_packet(void) {
         pdu_crc[j++] = flipChar((ble_vars.location_y >> 16) & 0xFF);
         pdu_crc[j++] = flipChar((ble_vars.location_y >> 8) & 0xFF);
         pdu_crc[j++] = flipChar(ble_vars.location_y & 0xFF);  // location_y LSB
+    }
+
+    if (ble_vars.tuning_code_mid_fine_tx_en) {
+        pdu_crc[j++] = BLE_TUNING_CODE_MID_FINE_HEADER;
+        pdu_crc[j++] = BLE_TUNING_CODE_MID_FINE_GAP_CODE;
+
+        // 直接传输mid (一个字节就够了，因为mid范围是0-31)
+        pdu_crc[j++] = flipChar(ble_vars.tuning_code.mid & 0xFF);
+
+        // 直接传输fine (一个字节就够了，因为fine范围是0-15)
+        pdu_crc[j++] = flipChar(ble_vars.tuning_code.fine & 0xFF);
     }
 
     if (ble_vars.temperature_tx_en) {
@@ -345,6 +345,16 @@ void ble_generate_location_packet(void) {
         for (k = 0; k < BLE_GAP_APPEARANCE_LENGTH; ++k) {
             pdu_crc[j++] = flipChar(ble_vars.appearance[k]);
         }
+    }
+
+    if (ble_vars.counter_tx_pkt_en) {  // 添加使能标志
+        pdu_crc[j++] = BLE_COUNTER_HEADER;
+        pdu_crc[j++] = BLE_COUNTER_GAP_CODE;
+
+        // 高字节在前，低字节在后
+        pdu_crc[j++] =
+            flipChar((ble_vars.tx_pkt_counter >> 8) & 0xFF);      // 高字节
+        pdu_crc[j++] = flipChar(ble_vars.tx_pkt_counter & 0xFF);  // 低字节
     }
 
     for (j = 0; j < BLE_PDU_LENGTH; ++j) {
