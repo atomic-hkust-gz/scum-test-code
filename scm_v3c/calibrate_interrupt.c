@@ -788,18 +788,18 @@ void sync_light_calibrate_set_optimal_clocks(void) {
     // analog_scan_chain_write();
     // analog_scan_chain_load();
     // print the result
-    printf(
-        "Set clock parameters:\r\n"
-        "  HF     : (coarse=%d, fine=%d)\r\n"
-        "  2M     : (coarse=%d, fine=%d, superfine=%d)\r\n"
-        "  LC     : (coarse=%d, mid=%d, fine=%d)\r\n"
-        "  IF     : (coarse=%d, fine=%d)\r\n"
-        "All clocks Done.\r\n",
-        synclight_cal_vars.HF_coarse_opt, synclight_cal_vars.HF_fine_opt,
-        synclight_cal_vars.RC2M_coarse_opt, synclight_cal_vars.RC2M_fine_opt,
-        synclight_cal_vars.RC2M_superfine_opt, synclight_cal_vars.LC_coarse_opt,
-        synclight_cal_vars.LC_mid_opt, synclight_cal_vars.LC_fine_opt,
-        synclight_cal_vars.IF_coarse_opt, synclight_cal_vars.IF_fine_opt);
+    // printf(
+    //     "Set clock parameters:\r\n"
+    //     "  HF     : (coarse=%d, fine=%d)\r\n"
+    //     "  2M     : (coarse=%d, fine=%d, superfine=%d)\r\n"
+    //     "  LC     : (coarse=%d, mid=%d, fine=%d)\r\n"
+    //     "  IF     : (coarse=%d, fine=%d)\r\n"
+    //     "All clocks Done.\r\n",
+    //     synclight_cal_vars.HF_coarse_opt, synclight_cal_vars.HF_fine_opt,
+    //     synclight_cal_vars.RC2M_coarse_opt, synclight_cal_vars.RC2M_fine_opt,
+    //     synclight_cal_vars.RC2M_superfine_opt, synclight_cal_vars.LC_coarse_opt,
+    //     synclight_cal_vars.LC_mid_opt, synclight_cal_vars.LC_fine_opt,
+    //     synclight_cal_vars.IF_coarse_opt, synclight_cal_vars.IF_fine_opt);
     // essential setup when change clocks settings
     // analog_scan_chain_write();
     // analog_scan_chain_load();

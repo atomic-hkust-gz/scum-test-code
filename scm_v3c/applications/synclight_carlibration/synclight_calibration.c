@@ -196,9 +196,9 @@ static inline void ble_tx_trigger(void) {
          tx_fine_code <= TUNING_MAX_CODE; ++tx_fine_code) {
         g_ble_tx_tuning_code.fine = tx_fine_code;
         tuning_tune_radio(&g_ble_tx_tuning_code);
-        printf("Transmitting BLE packet on %u.%u.%u.\n",
-               g_ble_tx_tuning_code.coarse, g_ble_tx_tuning_code.mid,
-               g_ble_tx_tuning_code.fine);
+        // printf("Transmitting BLE packet on %u.%u.%u.\n",
+        //        g_ble_tx_tuning_code.coarse, g_ble_tx_tuning_code.mid,
+        //        g_ble_tx_tuning_code.fine);
         // give tunning code data to pkt
         ble_vars.tuning_code.coarse = g_ble_tx_tuning_code.coarse;
         ble_vars.tuning_code.mid = g_ble_tx_tuning_code.mid;
@@ -1181,7 +1181,7 @@ static inline void state_sending(void) {
                    counter_ble_tx);
             ble_tx_trigger();
             g_ble_tx_trigger = false;
-            delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);
+            // delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);//for time reduced but not useful.
             counter_ble_tx--;
         }
         // counter_ble_tx--;
