@@ -116,7 +116,7 @@ sync_light_calibration_t sync_cal = {.count_sync_light = 0,
                                      .several_synclights_duration = 0,
                                      .count_calibration = 0,
                                      .counter_localization = 0,
-                                     .counter_lighthouse_state_period = 20,
+                                     .counter_lighthouse_state_period = 1,
                                      .counter_global_timer = 0,
                                      .counter_ble_tx_pkt = 0};
 
@@ -209,7 +209,7 @@ static inline void ble_tx_trigger(void) {
         ble_vars.tx_pkt_counter = sync_cal.counter_ble_tx_pkt;
 
         // need generate pkt again
-        ble_generate_location_packet();
+        // ble_generate_location_packet();// disable it fot test
 
         // Wait for the frequency to settle.
         for (uint32_t t = 0; t < 5000; ++t);
@@ -1005,11 +1005,11 @@ static inline void state_optical_collecting(void) {
     // transmitting
     ICER = 0xFFFF;
     // see the ASC value before set clock to optimal state
-    print_ASC();
+    // print_ASC();//for time reduced
     // set clock to optimal state
     sync_light_calibrate_set_optimal_clocks();
     // see the ASC value after set clock to optimal state
-    print_ASC();
+    // print_ASC();//for time reduced
     // close to 2s for changing  state between localization and
     // calibration
     sync_cal.counter_localization = sync_cal.counter_lighthouse_state_period;
@@ -1156,7 +1156,7 @@ static inline void state_sending(void) {
     // set clock to optimal state
     sync_light_calibrate_set_optimal_clocks();
     // see the ASC value after set clock to optimal state
-    print_ASC();
+    // print_ASC();//for time reduced
 
     // Configure coarse, mid, and fine codes for TX.
 #if BLE_CALIBRATE_LC
