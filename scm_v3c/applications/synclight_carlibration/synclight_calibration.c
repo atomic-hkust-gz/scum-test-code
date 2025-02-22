@@ -96,7 +96,10 @@ typedef struct {
     // total calibration times
     uint32_t count_calibration;
 
-    // a counter to record how many lighthouse decoding process passed.
+    // a counter to record how many lighthouse decoding process passed.(not just
+    // one sync/sweep period) it is a logic period. when 1000 while passed,
+    // print  info to serial port, then reduce this variable. If it is 0, end
+    // the entire optical collecting process.
     uint32_t counter_localization;
     // to set a entire lighthouse localization period duration.
     uint32_t counter_lighthouse_state_period;
@@ -1232,6 +1235,7 @@ int main(void) {
         update_state(scum_state);
         switch (scum_state) {
             case COLLECTING:
+                gpio_11_toggle();  // main loop start
                 printf("State: Lighthouse Locating.\n");
                 // restore ASC state before collecting
                 restore_ASC_state(asc_state.lighthouse_clock);
@@ -1278,6 +1282,7 @@ int main(void) {
             case SENDING:
                 printf("State: BLE transimitting.\n");
                 state_sending();
+                gpio_11_toggle();  // main loop end
                 break;
             case DEFAULT:
                 printf("State: Scum is running.\n");
