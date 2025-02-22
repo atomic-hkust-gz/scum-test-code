@@ -956,7 +956,7 @@ static void update_state(enum State current_state) {
             // 采集1-2秒后切换到数据整合状态
             if (sync_cal.counter_localization == 0) {
                 scum_state = INTEGRATING;
-                log_state_transition(current_state, scum_state);
+                // log_state_transition(current_state, scum_state);
             }
             break;
 
@@ -965,7 +965,7 @@ static void update_state(enum State current_state) {
             if (state_flags
                     .ble_packet_ready) {  // 需要添加一个标志位表示数据包准备完成
                 scum_state = SENDING;
-                log_state_transition(current_state, scum_state);
+                // log_state_transition(current_state, scum_state);
             }
             break;
 
@@ -977,7 +977,7 @@ static void update_state(enum State current_state) {
                 // 重置采集计时器
                 sync_cal.counter_localization =
                     sync_cal.counter_lighthouse_state_period;
-                log_state_transition(current_state, scum_state);
+                // log_state_transition(current_state, scum_state);
                 state_flags.ble_transmission_complete = false;
             }
             break;
@@ -995,7 +995,7 @@ static void update_state(enum State current_state) {
 // uint8_t sync_cal_lighthouse_state_period = 20000;
 
 static inline void state_optical_collecting(void) {
-    printf("State: Locating SCUM.\n");
+    // printf("State: Locating SCUM.\n");
     // in this state, we only need location information, so disable
     // calibration part.
     sync_cal.need_sync_calibration = 0;
@@ -1024,9 +1024,9 @@ static inline void state_optical_collecting(void) {
             sync_cal.counter_global_timer = 0;
             gpio_8_toggle();
             // sync_light_calibrate_isr();
-            printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", lighthouse_ptc.A_X,
-                   lighthouse_ptc.A_Y, lighthouse_ptc.B_X, lighthouse_ptc.B_Y);
-            printf("Remaining packets: %d\n", sync_cal.counter_localization);
+            // printf("A_X: %u, A_Y: %u, B_X: %u, B_Y: %u\n", lighthouse_ptc.A_X,
+            //        lighthouse_ptc.A_Y, lighthouse_ptc.B_X, lighthouse_ptc.B_Y);
+            // printf("Remaining packets: %d\n", sync_cal.counter_localization);
             sync_cal.counter_localization--;
             // save location to packet, should find a better way, not in this
             // function. ble_vars.location_x = lighthouse_ptc.A_X;
@@ -1117,7 +1117,7 @@ static inline void state_BLE_Adv_packet_with_location_generation(void) {
 bool sync_cal_ble_init_enable = true;
 
 static inline void state_sending(void) {
-    printf("State: BLE transimitting.\n");
+    // printf("State: BLE transimitting.\n");
     // enable/disable synclight calibration
     sync_cal.need_sync_calibration = 0;
     // now I use optical cal for debugging
@@ -1134,19 +1134,19 @@ static inline void state_sending(void) {
         config_ble_tx_mote();
 
         // Initialize BLE TX.
-        printf("Initializing BLE TX.\n");
+        // printf("Initializing BLE TX.\n");
         ble_init();
         ble_init_tx();
 
-        // Configure the RF timer.
-        rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
-        rftimer_enable_interrupts();
-        rftimer_enable_interrupts_by_id(7);
+        // Configure the RF timer.do not need periodic time interrupt in this experiment
+        // rftimer_set_callback_by_id(ble_tx_rftimer_callback, 7);
+        // rftimer_enable_interrupts();
+        // rftimer_enable_interrupts_by_id(7);
 
         analog_scan_chain_write();
         analog_scan_chain_load();
 
-        crc_check();
+        // crc_check(); // why here is a crc check?
         // perform_calibration();
         save_ASC_state(asc_state.ble_clock);
     }
@@ -1177,10 +1177,10 @@ static inline void state_sending(void) {
 
     while (counter_ble_tx) {  // counter_ble_tx
         if (g_ble_tx_trigger) {
-            printf("Triggering BLE TX. Remaining packet groups: %d\n",
-                   counter_ble_tx);
+            // printf("Triggering BLE TX. Remaining packet groups: %d\n",
+            //        counter_ble_tx);
             ble_tx_trigger();
-            g_ble_tx_trigger = false;
+            // g_ble_tx_trigger = false; // not need to reset it
             // delay_milliseconds_asynchronous(BLE_TX_PERIOD_MS, 7);//for time reduced but not useful.
             counter_ble_tx--;
         }
@@ -1236,7 +1236,7 @@ int main(void) {
         switch (scum_state) {
             case COLLECTING:
                 gpio_11_toggle();  // main loop start
-                printf("State: Lighthouse Locating.\n");
+                // printf("State: Lighthouse Locating.\n");
                 // restore ASC state before collecting
                 restore_ASC_state(asc_state.lighthouse_clock);
                 // disable synclight calibration
@@ -1271,7 +1271,7 @@ int main(void) {
                 break;
 
             case INTEGRATING:
-                printf("State: Integrating ble packet.\n");
+                // printf("State: Integrating ble packet.\n");
                 // a small gap used to generate the ble packet. for this
                 // fuction, I think it does not need to be an individual state,
                 // but in this way will be clearly
@@ -1280,7 +1280,7 @@ int main(void) {
                 state_flags.ble_packet_ready = true;
                 break;
             case SENDING:
-                printf("State: BLE transimitting.\n");
+                // printf("State: BLE transimitting.\n");
                 state_sending();
                 gpio_11_toggle();  // main loop end
                 break;

@@ -386,11 +386,11 @@ void ble_generate_location_packet(void) {
 
     memcpy(&ble_vars.packet[i], pdu_crc, BLE_PDU_LENGTH + BLE_CRC_LENGTH);
 
-    printf("pkt : ");
-    for (j = 0; j < BLE_PDU_LENGTH + BLE_CRC_LENGTH + 5; j++) {
-        printf("%x ", flipChar(ble_vars.packet[j]));
-    }
-    printf("\r\n");
+    // printf("pkt : ");
+    // for (j = 0; j < BLE_PDU_LENGTH + BLE_CRC_LENGTH + 5; j++) {
+    //     printf("%x ", flipChar(ble_vars.packet[j]));
+    // }
+    // printf("\r\n");
 }
 
 void ble_gen_test_packet(void) {
